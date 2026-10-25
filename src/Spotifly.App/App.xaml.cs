@@ -1,7 +1,9 @@
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
+using Spotifly.App.Models;
 using Spotifly.App.Services;
+using Spotifly.App.Views;
 
 namespace Spotifly.App;
 
@@ -15,7 +17,9 @@ public partial class App : System.Windows.Application
     private ISingleInstanceService? _singleInstanceService;
     private ILoggerService? _logger;
     private IAppLifecycleManager? _lifecycleManager;
+    private IOverlayPositionService? _positionService;
     private TrayIconService? _trayIconService;
+    private IslandView? _islandView;
 
     public static ILoggerService? Logger { get; private set; }
     public static IAppLifecycleManager? Lifecycle { get; private set; }
@@ -24,7 +28,7 @@ public partial class App : System.Windows.Application
     {
         base.OnStartup(e);
 
-        // 1. Initialize Structured Logging first so all subsequent errors can be logged safely
+        // 1. Initialize Structured Logging first
         _logger = new FileLoggerService();
         Logger = _logger;
         _logger.LogInformation("================== Spotifly Starting Up ==================");
@@ -37,7 +41,6 @@ public partial class App : System.Windows.Application
         if (!_singleInstanceService.IsFirstInstance)
         {
             _logger.LogInformation("Another Spotifly instance is already running. Signaled existing instance and exiting secondary process safely.");
-            // Dispose mutex/handle and exit immediately without initializing UI or trays
             _singleInstanceService.Dispose();
             Shutdown(0);
             return;
@@ -51,22 +54,28 @@ public partial class App : System.Windows.Application
         Lifecycle = _lifecycleManager;
         _lifecycleManager.RegisterDisposable(_singleInstanceService);
 
-        // 5. Initialize lightweight System Tray Icon for reliable explicit exit & background presence
+        // 5. Initialize Overlay Positioning and Island Window
+        _positionService = new OverlayPositionService();
+        _islandView = new IslandView(_positionService, _logger);
+        
+        // Window starts hidden as per blueprint specification
+        _islandView.Visibility = Visibility.Hidden;
+
+        // 6. Initialize System Tray Icon with Developer Toggle and explicit Exit
         _trayIconService = new TrayIconService(
             onExitRequested: () =>
             {
                 _logger.LogInformation("Exit command triggered via tray menu.");
                 _lifecycleManager.RequestExit();
             },
-            onOpenRequested: () =>
+            onToggleIslandRequested: () =>
             {
-                _logger.LogInformation("Open requested from tray icon.");
-                // In Phase 1 no island window is rendered yet, notify user non-intrusively
-                _trayIconService?.ShowNotification("Spotifly", "Spotifly background service is running.");
+                _logger.LogInformation("Island visibility toggle triggered from tray.");
+                _islandView?.ToggleVisibility();
             });
         _lifecycleManager.RegisterDisposable(_trayIconService);
 
-        _logger.LogInformation("Spotifly Phase 1 Shell initialized successfully in background mode.");
+        _logger.LogInformation("Spotifly Phase 2 Shell initialized with hidden IslandView overlay.");
     }
 
     private void OnSecondInstanceLaunched(object? sender, EventArgs e)
@@ -76,7 +85,7 @@ public partial class App : System.Windows.Application
         {
             _trayIconService?.ShowNotification(
                 "Spotifly",
-                "Spotifly is already running in the background.",
+                "Spotifly is already running in the background. Use the tray icon to toggle the island.",
                 System.Windows.Forms.ToolTipIcon.Info);
         });
     }
@@ -87,10 +96,7 @@ public partial class App : System.Windows.Application
         DispatcherUnhandledException += (s, args) =>
         {
             _logger?.LogError("Unhandled UI Dispatcher Exception caught.", args.Exception);
-            
-            // Mark as handled to prevent immediate process crash where recoverable
             args.Handled = true;
-
             ShowNonIntrusiveError("A UI error occurred. Spotifly will continue running.", args.Exception.Message);
         };
 
@@ -119,22 +125,21 @@ public partial class App : System.Windows.Application
     {
         try
         {
-            if (_trayIconService != null)
-            {
-                _trayIconService.ShowNotification(title, message, System.Windows.Forms.ToolTipIcon.Warning);
-            }
+            _trayIconService?.ShowNotification(title, message, System.Windows.Forms.ToolTipIcon.Warning);
         }
-        catch
-        {
-            // Fallback: never let error notifications crash the app
-        }
+        catch { }
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         _logger?.LogInformation($"Spotifly is shutting down with exit code {e.ApplicationExitCode}.");
         
-        // Clean up all registered disposables and cancel background tasks
+        if (_islandView != null)
+        {
+            _islandView.Close();
+            _islandView = null;
+        }
+
         _lifecycleManager?.Dispose();
 
         base.OnExit(e);

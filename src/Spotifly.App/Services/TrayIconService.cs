@@ -4,27 +4,30 @@ using System.Windows.Forms;
 namespace Spotifly.App.Services;
 
 /// <summary>
-/// Provides a lightweight, reliable system tray icon with an explicit Exit command.
-/// Ensures the background application can be shut down cleanly even when no windows are open.
+/// Provides a lightweight system tray icon with an explicit Exit command and developer testing toggles.
 /// </summary>
 public sealed class TrayIconService : IDisposable
 {
     private readonly NotifyIcon _notifyIcon;
     private readonly Action _onExitRequested;
-    private readonly Action? _onOpenRequested;
+    private readonly Action? _onToggleIslandRequested;
     private bool _disposed;
 
-    public TrayIconService(Action onExitRequested, Action? onOpenRequested = null)
+    public TrayIconService(Action onExitRequested, Action? onToggleIslandRequested = null)
     {
         _onExitRequested = onExitRequested;
-        _onOpenRequested = onOpenRequested;
+        _onToggleIslandRequested = onToggleIslandRequested;
 
         var contextMenu = new ContextMenuStrip();
         
-        var openItem = new ToolStripMenuItem("Spotifly (Island)");
+        var openItem = new ToolStripMenuItem("Spotifly (Toggle Island)");
         openItem.Font = new System.Drawing.Font(openItem.Font, System.Drawing.FontStyle.Bold);
-        openItem.Click += (s, e) => _onOpenRequested?.Invoke();
+        openItem.Click += (s, e) => _onToggleIslandRequested?.Invoke();
         contextMenu.Items.Add(openItem);
+
+        var devToggle = new ToolStripMenuItem("Developer: Toggle Island Visibility");
+        devToggle.Click += (s, e) => _onToggleIslandRequested?.Invoke();
+        contextMenu.Items.Add(devToggle);
 
         contextMenu.Items.Add(new ToolStripSeparator());
 
@@ -40,7 +43,7 @@ public sealed class TrayIconService : IDisposable
             Visible = true
         };
 
-        _notifyIcon.DoubleClick += (s, e) => _onOpenRequested?.Invoke();
+        _notifyIcon.DoubleClick += (s, e) => _onToggleIslandRequested?.Invoke();
     }
 
     public void ShowNotification(string title, string message, ToolTipIcon icon = ToolTipIcon.Info)

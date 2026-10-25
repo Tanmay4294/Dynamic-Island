@@ -1,0 +1,10 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Minimal Theme Defaults for Island Overlay -->
+    <SolidColorBrush x:Key="IslandBackgroundBrush" Color="#EE121212" />
+    <SolidColorBrush x:Key="IslandBorderBrush" Color="#44FFFFFF" />
+    <SolidColorBrush x:Key="IslandForegroundBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="IslandAccentBrush" Color="#1DB954" />
+
+</ResourceDictionary>
