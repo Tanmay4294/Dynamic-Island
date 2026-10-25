@@ -108,8 +108,70 @@ dotnet run --project src/Spotifly.App
   - Avoids re-decoding bitmaps on unchanged tracks across playback poll intervals.
   - Bounded HTTP timeouts (10–15s) and `CancellationToken` support throughout all background tasks.
   - Non-polling cursor tracking and playback polling paused entirely when island is hidden.
-- [ ] **Phase 14**: Packaging and Final Handoff
-- [ ] **Phase 14**: Packaging and Final Handoff
+- [x] **Phase 14**: Packaging and Final Handoff
+
+## Phase 14: Packaging, Production Deployment & Handoff Guide
+
+### 1. Target Environment & Runtime Requirements
+- **OS**: Windows 10 (version 1809+ / Build 17763+) or Windows 11 (x64)
+- **Runtime**:
+  - **Framework-Dependent**: Requires [.NET 8.0 Windows Desktop Runtime (`windowsdesktop-runtime-8.0-win-x64`)](https://dotnet.microsoft.com/download/dotnet/8.0).
+  - **Self-Contained (Recommended)**: Includes all necessary .NET 8 runtime and WPF binaries embedded in the output package; no prior .NET installation is required on the user's laptop.
+
+### 2. Publish Commands
+From the repository root (`C:\dynamic_island`), publish using either method:
+
+#### A. Self-Contained Release (Zero Prerequisites on Target Machine)
+```powershell
+dotnet publish src/Spotifly.App/Spotifly.App.csproj -c Release -r win-x64 --self-contained true -o publish/self-contained
+```
+- Output executable: `publish/self-contained/Spotifly.App.exe`
+
+#### B. Framework-Dependent Release (Lightweight)
+```powershell
+dotnet publish src/Spotifly.App/Spotifly.App.csproj -c Release -o publish/framework-dependent
+```
+- Output executable: `publish/framework-dependent/Spotifly.App.exe`
+
+### 3. Launching & Updating Spotifly
+- **Launch**: Double-click `Spotifly.App.exe`. Spotifly runs quietly in the background and places a Spotify-themed icon in the Windows Notification Area (system tray).
+- **Update**: Rebuild or publish the solution, then replace the files in your installation folder. Spotifly user settings (`%LocalAppData%\Spotifly\settings.json`) and secure tokens remain persisted and untouched across updates.
+
+### 4. Spotify Developer Configuration & Authorization
+1. Open the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and select your application: `Spotifly Windows dynamic island`.
+2. Go to **Settings** (`Basic Information` / `Redirect URIs`).
+3. Add the exact loopback redirect URI:
+   ```text
+   http://127.0.0.1:43821/callback
+   ```
+   *(Note: Spotify requires explicit `127.0.0.1`; `localhost` is strictly disallowed by Spotify).*
+4. In **User Management** (while in Development Mode):
+   - Add your Spotify account email to the **Users Allowlist**.
+   - Development Mode allows up to 5 authorized users, and the app creator must have an active Spotify Premium account.
+5. In Spotifly Settings, click **Connect Spotify** (or **Reconnect**). Your default browser will open to Spotify's authorization page. Click **Agree**; Spotify will redirect to the local loopback server, exchange the PKCE code for tokens with playback and playlist scopes (`user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative`), encrypt them via Windows DPAPI, and immediately verify connectivity.
+6. To **Disconnect**, open Settings and click **Disconnect Spotify**. All cached access and refresh tokens are wiped securely from Windows DPAPI storage.
+
+### 5. Settings, Themes, and Windows Startup
+- **Accessing Settings**: Click the **Gear** icon in the compact island view, or click **Settings** in the expanded header, or right-click the system tray icon and select **Settings**.
+- **Switching Themes**: Select between **Minimal**, **Modern**, and **Glassmorphism**. Changes apply instantly at runtime across all open views without restarting.
+- **Controlling Windows Startup**: Toggle **Launch at Windows Sign-in** in Settings. This idempotently configures `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` without requiring administrator privileges or elevation.
+- **Dismissing vs Exiting**:
+  - Clicking the **X** button on the compact island **dismisses/hides** the island; the app remains running in the background.
+  - Clicking **Exit** in Settings or right-clicking the tray icon and selecting **Exit** performs a full, cooperative shutdown, releasing the single-instance mutex.
+
+### 6. Spotify Policy & API Limitations
+- **Verification Notice**: Spotify Web API documentation, OAuth 2.0 PKCE tutorials, and Developer Terms of Service were last verified in **October 2026**.
+- **No Internal Audio Playback**: Spotifly acts as a remote controller and companion overlay; it does not download, decrypt, or stream raw audio streams locally.
+- **Active Player Requirement**: Spotify's Web Player API requires an active Spotify player device (desktop, web, or mobile app). If no device is active, Spotifly prompts the user to launch Spotify on a player device.
+- **Premium Requirement**: Track playback control via `/v1/me/player/play` requires an active Spotify Premium subscription.
+- **Simulated Progress Arc**: Semicircular progress arc operates in simulated mode to strictly comply with developer terms regarding audio visualizations and synchronization.
+
+### 7. Remaining Manual Verification Matrix
+Automated test coverage comprises 95 unit tests (`dotnet test -c Release Spotifly.sln`). The following checks require manual verification on the target laptop with a physical display and active Spotify account:
+1. **Physical Hover Activation**: Move mouse pointer into top 6 DIP activation zone to trigger compact dome emergence.
+2. **Real Spotify Authorization**: Complete OAuth PKCE flow in a live browser, verifying browser auto-redirect to loopback port `43821`.
+3. **Hardware Precision Touchpad**: Test two-finger vertical scrolling over Now Playing to confirm smooth, throttled switching to Library.
+4. **Multi-Monitor DPI Setup**: Drag or place overlay across secondary displays with 125%/150% scaling to observe geometry sharpness.
 
 ## Spotify Developer Dashboard Configuration (Phase 6)
 To enable real Spotify authentication with Spotifly:
