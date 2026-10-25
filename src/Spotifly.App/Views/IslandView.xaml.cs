@@ -13,9 +13,8 @@ namespace Spotifly.App.Views;
 
 /// <summary>
 /// Borderless, transparent, topmost window hosting the semicircular dynamic island.
-/// Implements Phase 3 state machine: Hidden, Compact, Expanded, SettingsOpen, Library, PlaylistTracks.
-/// Handles hover activation zone polling, smooth non-overlapping storyboard transitions,
-/// flicker prevention, and transparent click passthrough.
+/// Renders an authentic semicircular/domed vector geometry with a flat top edge flush
+/// against the screen and a smoothly curved bottom arc.
 /// </summary>
 public partial class IslandView : Window
 {
@@ -36,6 +35,9 @@ public partial class IslandView : Window
     private bool _isCursorInsideIsland;
     private bool _isInteracting;
     private SettingsWindow? _activeSettingsWindow;
+
+    // Dynamic vector geometry cache
+    private PathGeometry? _currentIslandGeometry;
 
     // Win32 constants for click-through and non-activating window management
     private const int GWL_EXSTYLE = -20;
@@ -153,8 +155,19 @@ public partial class IslandView : Window
             try
             {
                 var pointInWindow = PointFromScreen(screenPoint);
-                var hitResult = VisualTreeHelper.HitTest(this, pointInWindow);
 
+                // Convert window point to IslandContainer coordinate space
+                var containerOrigin = IslandContainer.TranslatePoint(new System.Windows.Point(0, 0), this);
+                var ptInContainer = new System.Windows.Point(pointInWindow.X - containerOrigin.X, pointInWindow.Y - containerOrigin.Y);
+
+                // Check exact vector geometry hit test
+                if (_currentIslandGeometry != null && !_currentIslandGeometry.FillContains(ptInContainer))
+                {
+                    handled = true;
+                    return new IntPtr(HTTRANSPARENT);
+                }
+
+                var hitResult = VisualTreeHelper.HitTest(this, pointInWindow);
                 if (hitResult == null || hitResult.VisualHit == RootLayout)
                 {
                     handled = true;
@@ -173,6 +186,68 @@ public partial class IslandView : Window
         return IntPtr.Zero;
     }
 
+    /// <summary>
+    /// Builds the vector geometry for the island: a flat top flush with the screen edge,
+    /// vertical sidewalls, and a smooth semicircular/elliptical bottom arc.
+    /// In Compact mode (250x55), an elliptical bottom arc gives an authentic semicircular dome.
+    /// In Expanded mode (360x150), corner arcs with a bottom flat span create a polished pill/stadium dome.
+    /// </summary>
+    public static PathGeometry CreateIslandGeometry(double width, double height, bool isCompact)
+    {
+        var figure = new PathFigure
+        {
+            StartPoint = new System.Windows.Point(0, 0),
+            IsClosed = true,
+            IsFilled = true
+        };
+
+        if (isCompact)
+        {
+            // Flat top edge: (0,0) -> (width, 0)
+            figure.Segments.Add(new LineSegment(new System.Windows.Point(width, 0), true));
+
+            // Small vertical drop: (width, 0) -> (width, drop)
+            double drop = Math.Max(0, height * 0.15); // ~8px drop
+            figure.Segments.Add(new LineSegment(new System.Windows.Point(width, drop), true));
+
+            // Smooth curved bottom arc to left side: (width, drop) -> (0, drop)
+            // ArcSegment radiusX = width/2, radiusY = height - drop
+            figure.Segments.Add(new ArcSegment(
+                new System.Windows.Point(0, drop),
+                new System.Windows.Size(width / 2.0, height - drop),
+                0,
+                false,
+                SweepDirection.Clockwise,
+                true));
+        }
+        else
+        {
+            // Expanded stadium/pill dome with large corner radii
+            double radius = 30.0;
+            figure.Segments.Add(new LineSegment(new System.Windows.Point(width, 0), true));
+            figure.Segments.Add(new LineSegment(new System.Windows.Point(width, height - radius), true));
+            figure.Segments.Add(new ArcSegment(
+                new System.Windows.Point(width - radius, height),
+                new System.Windows.Size(radius, radius),
+                0,
+                false,
+                SweepDirection.Clockwise,
+                true));
+            figure.Segments.Add(new LineSegment(new System.Windows.Point(radius, height), true));
+            figure.Segments.Add(new ArcSegment(
+                new System.Windows.Point(0, height - radius),
+                new System.Windows.Size(radius, radius),
+                0,
+                false,
+                SweepDirection.Clockwise,
+                true));
+        }
+
+        var geometry = new PathGeometry();
+        geometry.Figures.Add(figure);
+        return geometry;
+    }
+
     public void ApplyDimensions()
     {
         var d = _positionService.Dimensions;
@@ -181,7 +256,15 @@ public partial class IslandView : Window
 
         IslandContainer.Width = d.CompactWidth;
         IslandContainer.Height = d.CompactHeight;
-        IslandContainer.CornerRadius = new CornerRadius(0, 0, d.CompactCornerRadius, d.CompactCornerRadius);
+
+        UpdateIslandShape(d.CompactWidth, d.CompactHeight, isCompact: true);
+    }
+
+    private void UpdateIslandShape(double width, double height, bool isCompact)
+    {
+        _currentIslandGeometry = CreateIslandGeometry(width, height, isCompact);
+        IslandBackgroundPath.Data = _currentIslandGeometry;
+        IslandContentContainer.Clip = _currentIslandGeometry;
     }
 
     public void Reposition()
@@ -258,13 +341,11 @@ public partial class IslandView : Window
             try
             {
                 var ptInWindow = PointFromScreen(new System.Windows.Point(pt.X, pt.Y));
-                var bounds = new Rect(
-                    (Width - IslandContainer.ActualWidth) / 2.0,
-                    0,
-                    IslandContainer.ActualWidth,
-                    IslandContainer.ActualHeight);
+                var containerOrigin = IslandContainer.TranslatePoint(new System.Windows.Point(0, 0), this);
+                var ptInContainer = new System.Windows.Point(ptInWindow.X - containerOrigin.X, ptInWindow.Y - containerOrigin.Y);
 
-                bool isOverIsland = bounds.Contains(ptInWindow);
+                bool isOverIsland = _currentIslandGeometry != null && _currentIslandGeometry.FillContains(ptInContainer);
+
                 if (isOverIsland)
                 {
                     _hideTimer.Stop();
@@ -398,8 +479,8 @@ public partial class IslandView : Window
 
         if (to == IslandState.Compact)
         {
-            // Animate width, height, corner radius back to compact
-            AnimateIslandDimensions(dims.CompactWidth, dims.CompactHeight, dims.CompactCornerRadius, duration, easing);
+            // Animate width & height back to compact and update semicircular geometry
+            AnimateIslandDimensions(dims.CompactWidth, dims.CompactHeight, isCompact: true, duration, easing);
 
             // Cross-fade views: Compact visible, Expanded collapsed
             CompactView.Visibility = Visibility.Visible;
@@ -418,8 +499,8 @@ public partial class IslandView : Window
         }
         else if (to == IslandState.Expanded || to == IslandState.SettingsOpen || to == IslandState.Library || to == IslandState.PlaylistTracks)
         {
-            // Animate width, height, corner radius to expanded
-            AnimateIslandDimensions(dims.ExpandedWidth, dims.ExpandedHeight, dims.ExpandedCornerRadius, duration, easing);
+            // Animate width & height to expanded and update expanded stadium geometry
+            AnimateIslandDimensions(dims.ExpandedWidth, dims.ExpandedHeight, isCompact: false, duration, easing);
 
             // Cross-fade views: Expanded visible, Compact hidden
             ExpandedView.Visibility = Visibility.Visible;
@@ -438,21 +519,32 @@ public partial class IslandView : Window
         }
     }
 
-    private void AnimateIslandDimensions(double targetWidth, double targetHeight, double targetRadius, TimeSpan duration, IEasingFunction easing)
+    private void AnimateIslandDimensions(double targetWidth, double targetHeight, bool isCompact, TimeSpan duration, IEasingFunction easing)
     {
-        var widthAnim = new DoubleAnimation(IslandContainer.ActualWidth > 0 ? IslandContainer.ActualWidth : targetWidth, targetWidth, duration)
+        double startWidth = IslandContainer.ActualWidth > 0 ? IslandContainer.ActualWidth : targetWidth;
+        double startHeight = IslandContainer.ActualHeight > 0 ? IslandContainer.ActualHeight : targetHeight;
+
+        var widthAnim = new DoubleAnimation(startWidth, targetWidth, duration)
         {
             EasingFunction = easing
         };
 
-        var heightAnim = new DoubleAnimation(IslandContainer.ActualHeight > 0 ? IslandContainer.ActualHeight : targetHeight, targetHeight, duration)
+        var heightAnim = new DoubleAnimation(startHeight, targetHeight, duration)
         {
             EasingFunction = easing
         };
+
+        // Update the geometry at the end of the transition
+        heightAnim.Completed += (s, e) =>
+        {
+            UpdateIslandShape(targetWidth, targetHeight, isCompact);
+        };
+
+        // Immediately update shape structure for target bounds
+        UpdateIslandShape(targetWidth, targetHeight, isCompact);
 
         IslandContainer.BeginAnimation(FrameworkElement.WidthProperty, widthAnim);
         IslandContainer.BeginAnimation(FrameworkElement.HeightProperty, heightAnim);
-        IslandContainer.CornerRadius = new CornerRadius(0, 0, targetRadius, targetRadius);
     }
 
     // ==========================================
