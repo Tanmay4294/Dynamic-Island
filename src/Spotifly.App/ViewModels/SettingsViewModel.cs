@@ -13,6 +13,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     private readonly IStartupService _startupService;
     private readonly IAppLifecycleManager? _lifecycleManager;
     private readonly IOverlayPositionService? _positionService;
+    private readonly ISimulatedProgressService? _progressService;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -21,13 +22,27 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         IThemeService themeService,
         IStartupService startupService,
         IAppLifecycleManager? lifecycleManager = null,
-        IOverlayPositionService? positionService = null)
+        IOverlayPositionService? positionService = null,
+        ISimulatedProgressService? progressService = null)
     {
         _settingsService = settingsService;
         _themeService = themeService;
         _startupService = startupService;
         _lifecycleManager = lifecycleManager;
         _positionService = positionService;
+        _progressService = progressService;
+
+        if (_progressService != null)
+        {
+            _simulatedProgress = _progressService.Progress;
+            _isAutoSimulating = _progressService.IsAutoSimulating;
+            _progressService.ProgressChanged += (s, val) =>
+            {
+                _simulatedProgress = val;
+                OnPropertyChanged(nameof(SimulatedProgress));
+                OnPropertyChanged(nameof(SimulatedProgressPercentText));
+            };
+        }
 
         LoadFromModel(_settingsService.CurrentSettings);
     }
@@ -185,6 +200,53 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
             var version = Assembly.GetExecutingAssembly().GetName().Version;
             return version != null ? $"v{version.Major}.{version.Minor}.{version.Build}" : "v1.0.0";
         }
+    }
+
+    private double _simulatedProgress;
+    public double SimulatedProgress
+    {
+        get => _simulatedProgress;
+        set
+        {
+            var clamped = Math.Clamp(value, 0.0, 1.0);
+            if (Math.Abs(_simulatedProgress - clamped) > 0.0001)
+            {
+                _simulatedProgress = clamped;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(SimulatedProgressPercentText));
+                _progressService?.SetProgress(clamped);
+            }
+        }
+    }
+
+    public string SimulatedProgressPercentText => $"{Math.Round(_simulatedProgress * 100):0}%";
+
+    private bool _isAutoSimulating = true;
+    public bool IsAutoSimulating
+    {
+        get => _isAutoSimulating;
+        set
+        {
+            if (_isAutoSimulating != value)
+            {
+                _isAutoSimulating = value;
+                OnPropertyChanged();
+                if (_progressService != null)
+                {
+                    _progressService.IsAutoSimulating = value;
+                }
+            }
+        }
+    }
+
+    public void ResetSimulatedProgress()
+    {
+        _progressService?.Reset();
+    }
+
+    public void SimulateNextTrack()
+    {
+        _progressService?.NextTrack();
     }
 
     public void ResetToDefaults()

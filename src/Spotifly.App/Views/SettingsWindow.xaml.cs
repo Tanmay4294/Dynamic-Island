@@ -14,6 +14,16 @@ public partial class SettingsWindow : Window
         InitializeComponent();
     }
 
+    private void ResetProgressButton_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.ResetSimulatedProgress();
+    }
+
+    private void NextTrackButton_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SimulateNextTrack();
+    }
+
     private void ResetButton_Click(object sender, RoutedEventArgs e)
     {
         var result = System.Windows.MessageBox.Show(

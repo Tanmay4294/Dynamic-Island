@@ -31,8 +31,8 @@ dotnet run --project src/Spotifly.App
 - [x] **Phase 1**: Minimal WPF Shell and Single-Instance Behaviour
 - [x] **Phase 2**: Transparent Overlay Window and Semicircle Shape
 - [x] **Phase 3**: Hover Trigger, Compact Menu and Expanded/Collapsed States
-- [ ] **Phase 4**: Theme System and Settings Window
-- [ ] **Phase 5**: Curved Semicircular Progress Control (Simulated Data First)
+- [x] **Phase 4**: Theme System and Settings Window
+- [x] **Phase 5**: Curved Semicircular Progress Control (Simulated Data First)
 - [ ] **Phase 6**: Spotify Authentication and API Connectivity Test
 - [ ] **Phase 7**: Spotify Service: Now Playing, Playback and Album Art
 - [ ] **Phase 8**: Spotify Playlist List with Cover Art
@@ -42,3 +42,12 @@ dotnet run --project src/Spotifly.App
 - [ ] **Phase 12**: Windows Startup, Settings Persistence and Recovery
 - [ ] **Phase 13**: Testing, Accessibility, Performance and Security
 - [ ] **Phase 14**: Packaging and Final Handoff
+
+## Spotify Developer Policy Checkpoint (Phase 5)
+> [!IMPORTANT]
+> **Mandatory Policy Checkpoint before Phase 7 / Live Playback Binding**:
+> 1. In accordance with the **Spotify Developer Policy** and Spotify Developer Terms of Service, developers must strictly adhere to commercial and content display guidelines.
+> 2. Specific attention must be paid to restrictions against synchronizing sound recordings or Spotify content with external visual media, creating audio visualizations without explicit authorization, or modifying/deriving visual representations of Spotify-streamed audio.
+> 3. Until real-time playback position synchronization is thoroughly verified and vetted against current Spotify Developer terms, the progress arc remains decoupled from live Spotify position polling and seeking, operating in simulated mode.
+> 4. If developer authorization or policy compliance is unclear prior to Phase 7, the issue must be explicitly flagged for user review and confirmed before connecting live playback position APIs.
+

@@ -18,6 +18,11 @@
     <SolidColorBrush x:Key="InputBackgroundBrush" Color="#142118" />
     <SolidColorBrush x:Key="InputBorderBrush" Color="#284432" />
 
+    <!-- Progress Arc Theme Resources -->
+    <SolidColorBrush x:Key="ProgressArcTrackBrush" Color="#221ED760" />
+    <SolidColorBrush x:Key="ProgressArcForegroundBrush" Color="#1ED760" />
+    <SolidColorBrush x:Key="ProgressArcGlowBrush" Color="#551ED760" />
+
     <!-- DropShadow Effect for Modern Theme (Subtle green neon aura) -->
     <DropShadowEffect x:Key="IslandShadowEffect"
                       BlurRadius="18"

@@ -24,6 +24,7 @@ public partial class IslandView : Window
     private readonly IThemeService? _themeService;
     private readonly IStartupService? _startupService;
     private readonly IAppLifecycleManager? _lifecycleManager;
+    private readonly ISimulatedProgressService? _progressService;
     private bool _isDisposed;
 
     // State machine
@@ -84,7 +85,8 @@ public partial class IslandView : Window
         ISettingsService? settingsService = null,
         IThemeService? themeService = null,
         IStartupService? startupService = null,
-        IAppLifecycleManager? lifecycleManager = null)
+        IAppLifecycleManager? lifecycleManager = null,
+        ISimulatedProgressService? progressService = null)
     {
         _positionService = positionService;
         _logger = logger;
@@ -92,6 +94,7 @@ public partial class IslandView : Window
         _themeService = themeService;
         _startupService = startupService;
         _lifecycleManager = lifecycleManager;
+        _progressService = progressService;
 
         InitializeComponent();
 
@@ -100,6 +103,18 @@ public partial class IslandView : Window
         if (_settingsService != null)
         {
             _settingsService.SettingsChanged += OnSettingsChanged;
+        }
+
+        if (_progressService != null)
+        {
+            IslandProgressArc.Progress = _progressService.Progress;
+            _progressService.ProgressChanged += (s, progress) =>
+            {
+                Dispatcher.InvokeAsync(() =>
+                {
+                    IslandProgressArc.Progress = progress;
+                });
+            };
         }
 
         // 1. Activation timer: triggers after cursor stays in top zone for ActivationDelayMs
@@ -259,6 +274,10 @@ public partial class IslandView : Window
         _currentIslandGeometry = CreateIslandGeometry(width, height, isCompact);
         IslandBackgroundPath.Data = _currentIslandGeometry;
         IslandContentContainer.Clip = _currentIslandGeometry;
+        if (IslandProgressArc != null)
+        {
+            IslandProgressArc.IsCompact = isCompact;
+        }
     }
 
     public void Reposition()
@@ -571,7 +590,7 @@ public partial class IslandView : Window
             if (_activeSettingsWindow == null || !_activeSettingsWindow.IsLoaded)
             {
                 var vm = (_settingsService != null && _themeService != null && _startupService != null)
-                    ? new ViewModels.SettingsViewModel(_settingsService, _themeService, _startupService, _lifecycleManager, _positionService)
+                    ? new ViewModels.SettingsViewModel(_settingsService, _themeService, _startupService, _lifecycleManager, _positionService, _progressService)
                     : null;
 
                 if (vm != null)

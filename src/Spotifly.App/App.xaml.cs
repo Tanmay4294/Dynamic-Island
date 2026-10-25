@@ -21,6 +21,7 @@ public partial class App : System.Windows.Application
     private ISettingsService? _settingsService;
     private IThemeService? _themeService;
     private IStartupService? _startupService;
+    private ISimulatedProgressService? _progressService;
     private TrayIconService? _trayIconService;
     private IslandView? _islandView;
 
@@ -61,6 +62,7 @@ public partial class App : System.Windows.Application
         _settingsService = new SettingsService(null, _logger);
         _themeService = new ThemeService(_logger);
         _startupService = new WindowsStartupService(_logger);
+        _progressService = new SimulatedProgressService(_logger);
 
         // Load saved theme and apply immediately before opening UI
         var currentSettings = _settingsService.CurrentSettings;
@@ -79,7 +81,8 @@ public partial class App : System.Windows.Application
             _settingsService,
             _themeService,
             _startupService,
-            _lifecycleManager);
+            _lifecycleManager,
+            _progressService);
         
         // Window starts hidden as per blueprint specification
         _islandView.Visibility = Visibility.Hidden;

@@ -24,6 +24,11 @@
     <SolidColorBrush x:Key="InputBackgroundBrush" Color="#252D3C" />
     <SolidColorBrush x:Key="InputBorderBrush" Color="#45556F" />
 
+    <!-- Progress Arc Theme Resources -->
+    <SolidColorBrush x:Key="ProgressArcTrackBrush" Color="#28FFFFFF" />
+    <SolidColorBrush x:Key="ProgressArcForegroundBrush" Color="#EEFFFFFF" />
+    <SolidColorBrush x:Key="ProgressArcGlowBrush" Color="#40FFFFFF" />
+
     <!-- DropShadow Effect for Glassmorphism (Soft diffused ambient shadow) -->
     <DropShadowEffect x:Key="IslandShadowEffect"
                       BlurRadius="22"

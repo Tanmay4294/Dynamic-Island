@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:controls="clr-namespace:Spotifly.App.Controls"
         mc:Ignorable="d"
         Title="Spotifly Island"
         WindowStyle="None"
@@ -30,6 +31,18 @@
                   StrokeThickness="1"
                   HorizontalAlignment="Stretch"
                   VerticalAlignment="Stretch" />
+
+            <!-- Semicircular Curved Progress Arc (Phase 5) contouring the lower dome border -->
+            <controls:SemicircleProgressControl x:Name="IslandProgressArc"
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Stretch"
+                                                StrokeThickness="2.5"
+                                                Inset="1.5"
+                                                TrackBrush="{DynamicResource ProgressArcTrackBrush}"
+                                                ProgressBrush="{DynamicResource ProgressArcForegroundBrush}"
+                                                GlowBrush="{DynamicResource ProgressArcGlowBrush}"
+                                                IsCompact="True"
+                                                IsHitTestVisible="False" />
 
             <!-- Island Inner Content Container clipped to the exact Vector Geometry -->
             <Grid x:Name="IslandContentContainer"

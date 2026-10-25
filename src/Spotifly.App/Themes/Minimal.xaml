@@ -18,6 +18,11 @@
     <SolidColorBrush x:Key="InputBackgroundBrush" Color="#222222" />
     <SolidColorBrush x:Key="InputBorderBrush" Color="#3C3C3C" />
 
+    <!-- Progress Arc Theme Resources -->
+    <SolidColorBrush x:Key="ProgressArcTrackBrush" Color="#22FFFFFF" />
+    <SolidColorBrush x:Key="ProgressArcForegroundBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="ProgressArcGlowBrush" Color="Transparent" />
+
     <!-- DropShadow Effect for Island in Minimal Theme (pure shadow, zero glow) -->
     <DropShadowEffect x:Key="IslandShadowEffect"
                       BlurRadius="14"
