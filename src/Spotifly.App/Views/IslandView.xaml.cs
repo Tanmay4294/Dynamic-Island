@@ -20,6 +20,10 @@ public partial class IslandView : Window
 {
     private readonly IOverlayPositionService _positionService;
     private readonly ILoggerService? _logger;
+    private readonly ISettingsService? _settingsService;
+    private readonly IThemeService? _themeService;
+    private readonly IStartupService? _startupService;
+    private readonly IAppLifecycleManager? _lifecycleManager;
     private bool _isDisposed;
 
     // State machine
@@ -74,14 +78,29 @@ public partial class IslandView : Window
 
     public event EventHandler<IslandState>? IslandStateChanged;
 
-    public IslandView(IOverlayPositionService positionService, ILoggerService? logger = null)
+    public IslandView(
+        IOverlayPositionService positionService,
+        ILoggerService? logger = null,
+        ISettingsService? settingsService = null,
+        IThemeService? themeService = null,
+        IStartupService? startupService = null,
+        IAppLifecycleManager? lifecycleManager = null)
     {
         _positionService = positionService;
         _logger = logger;
+        _settingsService = settingsService;
+        _themeService = themeService;
+        _startupService = startupService;
+        _lifecycleManager = lifecycleManager;
 
         InitializeComponent();
 
         ApplyDimensions();
+
+        if (_settingsService != null)
+        {
+            _settingsService.SettingsChanged += OnSettingsChanged;
+        }
 
         // 1. Activation timer: triggers after cursor stays in top zone for ActivationDelayMs
         _activationTimer = new DispatcherTimer
@@ -526,6 +545,22 @@ public partial class IslandView : Window
     // Compact & Header Menu Button Handlers
     // ==========================================
 
+    private void OnSettingsChanged(object? sender, AppSettings newSettings)
+    {
+        Dispatcher.InvokeAsync(() =>
+        {
+            _positionService.Dimensions.ActivationDelayMs = newSettings.ActivationDelayMs;
+            _positionService.Dimensions.HideDelayMs = newSettings.HideDelayMs;
+            _positionService.Dimensions.HorizontalOffset = newSettings.HorizontalOffset;
+            _positionService.Dimensions.VerticalOffset = newSettings.VerticalOffset;
+
+            _activationTimer.Interval = TimeSpan.FromMilliseconds(newSettings.ActivationDelayMs);
+            _hideTimer.Interval = TimeSpan.FromMilliseconds(newSettings.HideDelayMs);
+
+            Reposition();
+        });
+    }
+
     private void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
         _isInteracting = true;
@@ -535,18 +570,25 @@ public partial class IslandView : Window
         {
             if (_activeSettingsWindow == null || !_activeSettingsWindow.IsLoaded)
             {
-                _activeSettingsWindow = new SettingsWindow
+                var vm = (_settingsService != null && _themeService != null && _startupService != null)
+                    ? new ViewModels.SettingsViewModel(_settingsService, _themeService, _startupService, _lifecycleManager, _positionService)
+                    : null;
+
+                if (vm != null)
                 {
-                    Owner = this
-                };
-                _activeSettingsWindow.Closed += (s, args) =>
-                {
-                    _activeSettingsWindow = null;
-                    _isInteracting = false;
-                    StartHideDelayIfNeeded();
-                };
-                _activeSettingsWindow.Show();
-                TransitionToState(IslandState.SettingsOpen);
+                    _activeSettingsWindow = new SettingsWindow(vm)
+                    {
+                        Owner = this
+                    };
+                    _activeSettingsWindow.Closed += (s, args) =>
+                    {
+                        _activeSettingsWindow = null;
+                        _isInteracting = false;
+                        StartHideDelayIfNeeded();
+                    };
+                    _activeSettingsWindow.Show();
+                    TransitionToState(IslandState.SettingsOpen);
+                }
             }
             else
             {

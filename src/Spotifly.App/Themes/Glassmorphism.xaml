@@ -1,0 +1,35 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- GLASSMORPHISM THEME: Translucent surface, frosted highlights, subtle gradient and borders -->
+    <!-- Gradient for simulated frosted acrylic surface without expensive CPU/GPU DWM blur -->
+    <LinearGradientBrush x:Key="IslandBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#C0262C36" Offset="0.0" />
+        <GradientStop Color="#A0141820" Offset="1.0" />
+    </LinearGradientBrush>
+
+    <!-- Translucent high-contrast white border for crisp edge on light/dark wallpapers -->
+    <SolidColorBrush x:Key="IslandBorderBrush" Color="#66FFFFFF" />
+    <SolidColorBrush x:Key="IslandForegroundBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="IslandSecondaryForegroundBrush" Color="#D0D6E0" />
+    <SolidColorBrush x:Key="IslandAccentBrush" Color="#4DE084" />
+    <SolidColorBrush x:Key="IslandButtonHoverBrush" Color="#30FFFFFF" />
+    <SolidColorBrush x:Key="IslandButtonPressedBrush" Color="#50FFFFFF" />
+    <SolidColorBrush x:Key="IslandCardBackgroundBrush" Color="#35FFFFFF" />
+    <SolidColorBrush x:Key="IslandCardBorderBrush" Color="#44FFFFFF" />
+
+    <!-- Window Background & Controls for Settings / Dialogs -->
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#181D26" />
+    <SolidColorBrush x:Key="WindowBorderBrush" Color="#45546C" />
+    <SolidColorBrush x:Key="InputBackgroundBrush" Color="#252D3C" />
+    <SolidColorBrush x:Key="InputBorderBrush" Color="#45556F" />
+
+    <!-- DropShadow Effect for Glassmorphism (Soft diffused ambient shadow) -->
+    <DropShadowEffect x:Key="IslandShadowEffect"
+                      BlurRadius="22"
+                      Color="#000000"
+                      Opacity="0.60"
+                      ShadowDepth="5"
+                      Direction="270" />
+
+</ResourceDictionary>

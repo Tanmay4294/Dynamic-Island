@@ -1,0 +1,29 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- MODERN THEME: Dark surface with restrained Spotify-green accents and glowing outline -->
+    <SolidColorBrush x:Key="IslandBackgroundBrush" Color="#FA0E1511" />
+    <SolidColorBrush x:Key="IslandBorderBrush" Color="#661DB954" />
+    <SolidColorBrush x:Key="IslandForegroundBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="IslandSecondaryForegroundBrush" Color="#A5C7B0" />
+    <SolidColorBrush x:Key="IslandAccentBrush" Color="#1ED760" />
+    <SolidColorBrush x:Key="IslandButtonHoverBrush" Color="#251DB954" />
+    <SolidColorBrush x:Key="IslandButtonPressedBrush" Color="#401DB954" />
+    <SolidColorBrush x:Key="IslandCardBackgroundBrush" Color="#16221A" />
+    <SolidColorBrush x:Key="IslandCardBorderBrush" Color="#331DB954" />
+
+    <!-- Window Background & Controls for Settings / Dialogs -->
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#0D1310" />
+    <SolidColorBrush x:Key="WindowBorderBrush" Color="#2E4A37" />
+    <SolidColorBrush x:Key="InputBackgroundBrush" Color="#142118" />
+    <SolidColorBrush x:Key="InputBorderBrush" Color="#284432" />
+
+    <!-- DropShadow Effect for Modern Theme (Subtle green neon aura) -->
+    <DropShadowEffect x:Key="IslandShadowEffect"
+                      BlurRadius="18"
+                      Color="#1DB954"
+                      Opacity="0.45"
+                      ShadowDepth="2"
+                      Direction="270" />
+
+</ResourceDictionary>

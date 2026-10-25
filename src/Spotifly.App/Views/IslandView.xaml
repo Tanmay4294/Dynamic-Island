@@ -19,15 +19,8 @@
         <Grid x:Name="IslandContainer"
               HorizontalAlignment="Center"
               VerticalAlignment="Top"
-              ClipToBounds="False">
-
-            <Grid.Effect>
-                <DropShadowEffect BlurRadius="16"
-                                  Color="#000000"
-                                  Opacity="0.5"
-                                  ShadowDepth="4"
-                                  Direction="270" />
-            </Grid.Effect>
+              ClipToBounds="False"
+              Effect="{DynamicResource IslandShadowEffect}">
 
             <!-- Vector Path for the Semicircular / Domed Island Shape -->
             <!-- Flat top edge flush against the screen top; smooth curved bottom -->

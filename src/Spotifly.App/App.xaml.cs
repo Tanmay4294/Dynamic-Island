@@ -18,6 +18,9 @@ public partial class App : System.Windows.Application
     private ILoggerService? _logger;
     private IAppLifecycleManager? _lifecycleManager;
     private IOverlayPositionService? _positionService;
+    private ISettingsService? _settingsService;
+    private IThemeService? _themeService;
+    private IStartupService? _startupService;
     private TrayIconService? _trayIconService;
     private IslandView? _islandView;
 
@@ -54,14 +57,34 @@ public partial class App : System.Windows.Application
         Lifecycle = _lifecycleManager;
         _lifecycleManager.RegisterDisposable(_singleInstanceService);
 
-        // 5. Initialize Overlay Positioning and Island Window
+        // 5. Initialize Core Services: Settings, Theme, and Windows Startup
+        _settingsService = new SettingsService(null, _logger);
+        _themeService = new ThemeService(_logger);
+        _startupService = new WindowsStartupService(_logger);
+
+        // Load saved theme and apply immediately before opening UI
+        var currentSettings = _settingsService.CurrentSettings;
+        _themeService.ApplyTheme(currentSettings.Theme);
+
+        // 6. Initialize Overlay Positioning and configure dimensions from persisted settings
         _positionService = new OverlayPositionService();
-        _islandView = new IslandView(_positionService, _logger);
+        _positionService.Dimensions.ActivationDelayMs = currentSettings.ActivationDelayMs;
+        _positionService.Dimensions.HideDelayMs = currentSettings.HideDelayMs;
+        _positionService.Dimensions.HorizontalOffset = currentSettings.HorizontalOffset;
+        _positionService.Dimensions.VerticalOffset = currentSettings.VerticalOffset;
+
+        _islandView = new IslandView(
+            _positionService,
+            _logger,
+            _settingsService,
+            _themeService,
+            _startupService,
+            _lifecycleManager);
         
         // Window starts hidden as per blueprint specification
         _islandView.Visibility = Visibility.Hidden;
 
-        // 6. Initialize System Tray Icon with Developer Toggle and explicit Exit
+        // 7. Initialize System Tray Icon with Developer Toggle and explicit Exit
         _trayIconService = new TrayIconService(
             onExitRequested: () =>
             {
@@ -75,7 +98,7 @@ public partial class App : System.Windows.Application
             });
         _lifecycleManager.RegisterDisposable(_trayIconService);
 
-        _logger.LogInformation("Spotifly Phase 3 Shell initialized with IslandView overlay and hover triggers.");
+        _logger.LogInformation("Spotifly Phase 4 Shell initialized with ThemeService and Settings.");
     }
 
     private void OnSecondInstanceLaunched(object? sender, EventArgs e)

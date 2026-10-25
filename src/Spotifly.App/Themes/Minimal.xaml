@@ -1,45 +1,29 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- Minimal Theme Defaults for Island Overlay -->
-    <SolidColorBrush x:Key="IslandBackgroundBrush" Color="#EE141414" />
+    <!-- MINIMAL THEME: Clean, dark neutral surface, simple crisp borders, no glow -->
+    <SolidColorBrush x:Key="IslandBackgroundBrush" Color="#EE121212" />
     <SolidColorBrush x:Key="IslandBorderBrush" Color="#33FFFFFF" />
     <SolidColorBrush x:Key="IslandForegroundBrush" Color="#FFFFFFFF" />
     <SolidColorBrush x:Key="IslandSecondaryForegroundBrush" Color="#B3B3B3" />
     <SolidColorBrush x:Key="IslandAccentBrush" Color="#1DB954" />
-    <SolidColorBrush x:Key="IslandButtonHoverBrush" Color="#26FFFFFF" />
-    <SolidColorBrush x:Key="IslandButtonPressedBrush" Color="#40FFFFFF" />
+    <SolidColorBrush x:Key="IslandButtonHoverBrush" Color="#22FFFFFF" />
+    <SolidColorBrush x:Key="IslandButtonPressedBrush" Color="#38FFFFFF" />
+    <SolidColorBrush x:Key="IslandCardBackgroundBrush" Color="#1E1E1E" />
+    <SolidColorBrush x:Key="IslandCardBorderBrush" Color="#2E2E2E" />
 
-    <!-- Style for Circular Vector Icon Buttons in Island -->
-    <Style x:Key="IslandCircleButtonStyle" TargetType="Button">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-        <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Grid Background="Transparent">
-                        <Border x:Name="HoverBackground"
-                                CornerRadius="18"
-                                Background="Transparent"
-                                HorizontalAlignment="Stretch"
-                                VerticalAlignment="Stretch" />
-                        <ContentPresenter HorizontalAlignment="Center"
-                                          VerticalAlignment="Center" />
-                    </Grid>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="HoverBackground" Property="Background" Value="{DynamicResource IslandButtonHoverBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="HoverBackground" Property="Background" Value="{DynamicResource IslandButtonPressedBrush}" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
+    <!-- Window Background & Controls for Settings / Dialogs -->
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#141414" />
+    <SolidColorBrush x:Key="WindowBorderBrush" Color="#2A2A2A" />
+    <SolidColorBrush x:Key="InputBackgroundBrush" Color="#222222" />
+    <SolidColorBrush x:Key="InputBorderBrush" Color="#3C3C3C" />
+
+    <!-- DropShadow Effect for Island in Minimal Theme (pure shadow, zero glow) -->
+    <DropShadowEffect x:Key="IslandShadowEffect"
+                      BlurRadius="14"
+                      Color="#000000"
+                      Opacity="0.55"
+                      ShadowDepth="4"
+                      Direction="270" />
 
 </ResourceDictionary>
