@@ -29,6 +29,8 @@ public partial class IslandView : Window
     private readonly ISpotifyApiService? _apiService;
     private readonly ISpotifyService? _spotifyService;
     private readonly DispatcherTimer _playbackPollTimer;
+    private PlaylistInfo? _selectedPlaylist;
+    private double _lastPlaylistVerticalOffset;
     private bool _isDisposed;
 
     // State machine
@@ -544,13 +546,26 @@ public partial class IslandView : Window
             {
                 ExpandedTitleText.Text = "Playlists";
                 NowPlayingPanel.Visibility = Visibility.Collapsed;
+                PlaylistTracksPanel.Visibility = Visibility.Collapsed;
                 PlaylistsLibraryPanel.Visibility = Visibility.Visible;
                 _ = LoadPlaylistsAsync();
+            }
+            else if (to == IslandState.PlaylistTracks)
+            {
+                ExpandedTitleText.Text = "Songs";
+                NowPlayingPanel.Visibility = Visibility.Collapsed;
+                PlaylistsLibraryPanel.Visibility = Visibility.Collapsed;
+                PlaylistTracksPanel.Visibility = Visibility.Visible;
+                if (_selectedPlaylist != null)
+                {
+                    _ = LoadPlaylistTracksAsync(_selectedPlaylist.Id);
+                }
             }
             else
             {
                 ExpandedTitleText.Text = "Now Playing";
                 PlaylistsLibraryPanel.Visibility = Visibility.Collapsed;
+                PlaylistTracksPanel.Visibility = Visibility.Collapsed;
                 NowPlayingPanel.Visibility = Visibility.Visible;
             }
 
@@ -869,8 +884,118 @@ public partial class IslandView : Window
         if (sender is FrameworkElement elem && elem.DataContext is PlaylistInfo playlist)
         {
             _logger?.LogInformation($"Selected playlist: {playlist.Name} ({playlist.Id}). Transitioning to PlaylistTracks state.");
-            // Clean navigation handoff to PlaylistTracks state for Phase 9
+            _selectedPlaylist = playlist;
+            _lastPlaylistVerticalOffset = PlaylistsScrollViewer.VerticalOffset;
+            ActivePlaylistNameText.Text = playlist.Name;
             TransitionToState(IslandState.PlaylistTracks);
+        }
+    }
+
+    private async Task LoadPlaylistTracksAsync(string playlistId, bool forceRefresh = false)
+    {
+        if (_spotifyService == null) return;
+
+        TracksStatusContainer.Visibility = Visibility.Visible;
+        TracksStatusText.Text = "Loading songs...";
+        RetryTracksButton.Visibility = Visibility.Collapsed;
+        TracksItemsControl.ItemsSource = null;
+
+        try
+        {
+            var tracks = await _spotifyService.GetPlaylistTracksAsync(playlistId, forceRefresh);
+            TracksItemsControl.ItemsSource = tracks;
+
+            if (tracks == null || tracks.Count == 0)
+            {
+                TracksStatusText.Text = "No playable songs found in this playlist.";
+                TracksStatusContainer.Visibility = Visibility.Visible;
+                RetryTracksButton.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                TracksStatusContainer.Visibility = Visibility.Collapsed;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError($"Error loading songs for playlist {playlistId}.", ex);
+            TracksStatusText.Text = "Failed to load playlist songs.";
+            TracksStatusContainer.Visibility = Visibility.Visible;
+            RetryTracksButton.Visibility = Visibility.Visible;
+        }
+    }
+
+    private void BackToPlaylistsButton_Click(object sender, RoutedEventArgs e)
+    {
+        _isInteracting = true;
+        _hideTimer.Stop();
+
+        TransitionToState(IslandState.Library);
+        // Restore previous scroll position
+        Dispatcher.InvokeAsync(() =>
+        {
+            PlaylistsScrollViewer.ScrollToVerticalOffset(_lastPlaylistVerticalOffset);
+        });
+
+        _isInteracting = false;
+        StartHideDelayIfNeeded();
+    }
+
+    private async void RefreshTracksButton_Click(object sender, RoutedEventArgs e)
+    {
+        _isInteracting = true;
+        _hideTimer.Stop();
+
+        if (_selectedPlaylist != null)
+        {
+            await LoadPlaylistTracksAsync(_selectedPlaylist.Id, forceRefresh: true);
+        }
+
+        _isInteracting = false;
+        StartHideDelayIfNeeded();
+    }
+
+    private async void TrackItem_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement elem && elem.DataContext is TrackInfo track)
+        {
+            await PlayTrackInternalAsync(track);
+        }
+    }
+
+    private async void PlayTrackButton_Click(object sender, RoutedEventArgs e)
+    {
+        _isInteracting = true;
+        _hideTimer.Stop();
+
+        if (sender is FrameworkElement elem && elem.Tag is TrackInfo track)
+        {
+            await PlayTrackInternalAsync(track);
+        }
+
+        _isInteracting = false;
+        StartHideDelayIfNeeded();
+    }
+
+    private async Task PlayTrackInternalAsync(TrackInfo track)
+    {
+        if (_spotifyService == null || string.IsNullOrEmpty(track.Uri)) return;
+
+        _logger?.LogInformation($"Playing selected track: {track.Name} ({track.Uri}).");
+        bool success = await _spotifyService.PlayTrackAsync(track.Uri, _selectedPlaylist?.Uri);
+        if (!success)
+        {
+            _logger?.LogWarning("Playback could not be started directly. Track may be restricted or no active player was found.");
+        }
+    }
+
+    private void ScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        // Keep mouse-wheel scrolling confined inside the child list view, preventing outer layout triggers
+        if (sender is System.Windows.Controls.ScrollViewer scroller)
+        {
+            scroller.ScrollToVerticalOffset(scroller.VerticalOffset - e.Delta);
+            e.Handled = true;
         }
     }
 

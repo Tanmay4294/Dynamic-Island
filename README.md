@@ -36,7 +36,7 @@ dotnet run --project src/Spotifly.App
 - [x] **Phase 6**: Spotify Authentication and API Connectivity Test
 - [x] **Phase 7**: Spotify Service: Now Playing, Playback and Album Art
 - [x] **Phase 8**: Spotify Playlist List with Cover Art
-- [ ] **Phase 9**: Playlist Song List with Album Art
+- [x] **Phase 9**: Playlist Song List with Album Art
 - [ ] **Phase 10**: Click a Song to Play It
 - [ ] **Phase 11**: Mouse-Wheel Mode Switching and Navigation Polish
 - [ ] **Phase 12**: Windows Startup, Settings Persistence and Recovery
