@@ -3,6 +3,8 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using Spotifly.App.Models;
 using Spotifly.App.Services;
@@ -11,8 +13,9 @@ namespace Spotifly.App.Views;
 
 /// <summary>
 /// Borderless, transparent, topmost window hosting the semicircular dynamic island.
-/// Handles resolution changes, DPI adjustments, non-activating window styles,
-/// and transparent hit-test passthrough.
+/// Implements Phase 3 state machine: Hidden, Compact, Expanded, SettingsOpen, Library, PlaylistTracks.
+/// Handles hover activation zone polling, smooth non-overlapping storyboard transitions,
+/// flicker prevention, and transparent click passthrough.
 /// </summary>
 public partial class IslandView : Window
 {
@@ -20,10 +23,34 @@ public partial class IslandView : Window
     private readonly ILoggerService? _logger;
     private bool _isDisposed;
 
+    // State machine
+    private IslandState _currentState = IslandState.Hidden;
+    public IslandState CurrentState => _currentState;
+
+    // Polling & timer mechanisms for reliable cursor tracking without global hooks
+    private readonly DispatcherTimer _cursorPollingTimer;
+    private readonly DispatcherTimer _activationTimer;
+    private readonly DispatcherTimer _hideTimer;
+
+    private bool _isCursorInsideActivationZone;
+    private bool _isCursorInsideIsland;
+    private bool _isInteracting;
+    private SettingsWindow? _activeSettingsWindow;
+
     // Win32 constants for click-through and non-activating window management
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_TOOLWINDOW = 0x00000080;
     private const int WS_EX_NOACTIVATE = 0x08000000;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    [DllImport("user32.dll")]
+    public static extern bool GetCursorPos(out POINT lpPoint);
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
     private static extern IntPtr GetWindowLongPtr32(IntPtr hWnd, int nIndex);
@@ -43,6 +70,8 @@ public partial class IslandView : Window
     private static IntPtr SetWindowLong(IntPtr hWnd, int nIndex, IntPtr dwNewLong) =>
         IntPtr.Size == 8 ? SetWindowLongPtr64(hWnd, nIndex, dwNewLong) : new IntPtr(SetWindowLong32(hWnd, nIndex, dwNewLong.ToInt32()));
 
+    public event EventHandler<IslandState>? IslandStateChanged;
+
     public IslandView(IOverlayPositionService positionService, ILoggerService? logger = null)
     {
         _positionService = positionService;
@@ -52,8 +81,37 @@ public partial class IslandView : Window
 
         ApplyDimensions();
 
-        // Listen for system display/resolution changes
+        // 1. Activation timer: triggers after cursor stays in top zone for ActivationDelayMs
+        _activationTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(_positionService.Dimensions.ActivationDelayMs)
+        };
+        _activationTimer.Tick += OnActivationTimerTick;
+
+        // 2. Hide delay timer: triggers after cursor leaves island for HideDelayMs
+        _hideTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(_positionService.Dimensions.HideDelayMs)
+        };
+        _hideTimer.Tick += OnHideTimerTick;
+
+        // 3. Regular cursor polling (40ms ~ 25 FPS) avoids problematic global low-level mouse hooks
+        _cursorPollingTimer = new DispatcherTimer(DispatcherPriority.Normal)
+        {
+            Interval = TimeSpan.FromMilliseconds(40)
+        };
+        _cursorPollingTimer.Tick += OnCursorPollTick;
+
+        // Listen for screen resolution and display changes
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+
+        // Hook MouseEnter / MouseLeave on IslandContainer for robust direct hover detection
+        IslandContainer.MouseEnter += OnIslandMouseEnter;
+        IslandContainer.MouseLeave += OnIslandMouseLeave;
+
+        // Start hidden by default
+        Visibility = Visibility.Hidden;
+        _cursorPollingTimer.Start();
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -63,12 +121,10 @@ public partial class IslandView : Window
         var hwnd = new WindowInteropHelper(this).Handle;
         if (hwnd != IntPtr.Zero)
         {
-            // Set extended style WS_EX_TOOLWINDOW and WS_EX_NOACTIVATE to prevent stealing focus
             var exStyle = GetWindowLong(hwnd, GWL_EXSTYLE).ToInt64();
             exStyle |= WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE;
             SetWindowLong(hwnd, GWL_EXSTYLE, new IntPtr(exStyle));
 
-            // Hook HwndSource for WM_NCHITTEST transparent passthrough
             var source = HwndSource.FromHwnd(hwnd);
             source?.AddHook(WndProc);
         }
@@ -84,7 +140,12 @@ public partial class IslandView : Window
 
         if (msg == WM_NCHITTEST)
         {
-            // Convert screen coordinates to window DIP coordinates
+            if (_currentState == IslandState.Hidden || Visibility != Visibility.Visible)
+            {
+                handled = true;
+                return new IntPtr(HTTRANSPARENT);
+            }
+
             int x = (short)(lParam.ToInt64() & 0xFFFF);
             int y = (short)((lParam.ToInt64() >> 16) & 0xFFFF);
             var screenPoint = new System.Windows.Point(x, y);
@@ -92,23 +153,20 @@ public partial class IslandView : Window
             try
             {
                 var pointInWindow = PointFromScreen(screenPoint);
-
-                // Hit test our visual tree to see if the click is over the visible island
                 var hitResult = VisualTreeHelper.HitTest(this, pointInWindow);
+
                 if (hitResult == null || hitResult.VisualHit == RootLayout)
                 {
-                    // Transparent area outside the semicircle: pass clicks straight through to desktop/windows behind
                     handled = true;
                     return new IntPtr(HTTRANSPARENT);
                 }
 
-                // Hit is on the semicircle island itself: handle normally
                 handled = true;
                 return new IntPtr(HTCLIENT);
             }
             catch
             {
-                // Fallback: don't intercept if coordinates cannot be transformed
+                // Passthrough on error
             }
         }
 
@@ -123,7 +181,7 @@ public partial class IslandView : Window
 
         IslandContainer.Width = d.CompactWidth;
         IslandContainer.Height = d.CompactHeight;
-        IslandContainer.CornerRadius = new CornerRadius(0, 0, d.CornerRadius, d.CornerRadius);
+        IslandContainer.CornerRadius = new CornerRadius(0, 0, d.CompactCornerRadius, d.CompactCornerRadius);
     }
 
     public void Reposition()
@@ -140,8 +198,6 @@ public partial class IslandView : Window
 
             Left = left;
             Top = top;
-
-            _logger?.LogDebug($"Repositioned IslandView to Left={Left}, Top={Top} on screen width={workArea.Width}.");
         }
         catch (Exception ex)
         {
@@ -151,22 +207,320 @@ public partial class IslandView : Window
 
     private void OnDisplaySettingsChanged(object? sender, EventArgs e)
     {
-        _logger?.LogInformation("Display settings or resolution changed event received.");
+        _logger?.LogInformation("Display settings or resolution changed.");
         Dispatcher.InvokeAsync(Reposition);
+    }
+
+    private void OnCursorPollTick(object? sender, EventArgs e)
+    {
+        if (!GetCursorPos(out var pt))
+        {
+            return;
+        }
+
+        var workArea = SystemParameters.WorkArea;
+        var dims = _positionService.Dimensions;
+
+        // Check if cursor is in the top-centre activation trigger zone
+        double centerScreenX = workArea.Left + (workArea.Width / 2.0) + dims.HorizontalOffset;
+        double zoneLeft = centerScreenX - (dims.ActivationZoneWidth / 2.0);
+        double zoneRight = centerScreenX + (dims.ActivationZoneWidth / 2.0);
+        double zoneTop = workArea.Top + dims.VerticalOffset;
+        double zoneBottom = zoneTop + dims.ActivationZoneHeight;
+
+        bool inZone = (pt.X >= zoneLeft && pt.X <= zoneRight && pt.Y >= zoneTop && pt.Y <= zoneBottom);
+
+        if (inZone)
+        {
+            if (!_isCursorInsideActivationZone)
+            {
+                _isCursorInsideActivationZone = true;
+                _hideTimer.Stop();
+
+                if (_currentState == IslandState.Hidden)
+                {
+                    _activationTimer.Start();
+                }
+            }
+        }
+        else
+        {
+            if (_isCursorInsideActivationZone)
+            {
+                _isCursorInsideActivationZone = false;
+                _activationTimer.Stop();
+            }
+        }
+
+        // Check if cursor is currently over the visible island bounds
+        if (Visibility == Visibility.Visible && _currentState != IslandState.Hidden)
+        {
+            try
+            {
+                var ptInWindow = PointFromScreen(new System.Windows.Point(pt.X, pt.Y));
+                var bounds = new Rect(
+                    (Width - IslandContainer.ActualWidth) / 2.0,
+                    0,
+                    IslandContainer.ActualWidth,
+                    IslandContainer.ActualHeight);
+
+                bool isOverIsland = bounds.Contains(ptInWindow);
+                if (isOverIsland)
+                {
+                    _hideTimer.Stop();
+                    _isCursorInsideIsland = true;
+
+                    // If currently compact and cursor is hovering, expand it
+                    if (_currentState == IslandState.Compact && !_isInteracting)
+                    {
+                        TransitionToState(IslandState.Expanded);
+                    }
+                }
+                else
+                {
+                    if (_isCursorInsideIsland)
+                    {
+                        _isCursorInsideIsland = false;
+                        StartHideDelayIfNeeded();
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback
+            }
+        }
+    }
+
+    private void OnActivationTimerTick(object? sender, EventArgs e)
+    {
+        _activationTimer.Stop();
+        if (_isCursorInsideActivationZone || _isCursorInsideIsland)
+        {
+            _logger?.LogInformation("Activation timer elapsed: transitioning to Compact.");
+            TransitionToState(IslandState.Compact);
+        }
+    }
+
+    private void OnHideTimerTick(object? sender, EventArgs e)
+    {
+        _hideTimer.Stop();
+
+        // Do not hide while interacting, while pointer is inside, or while settings window is open
+        if (_isCursorInsideIsland || _isCursorInsideActivationZone || _isInteracting || (_activeSettingsWindow != null && _activeSettingsWindow.IsLoaded))
+        {
+            return;
+        }
+
+        _logger?.LogInformation("Hide timer elapsed: transitioning to Hidden.");
+        TransitionToState(IslandState.Hidden);
+    }
+
+    private void StartHideDelayIfNeeded()
+    {
+        if (_currentState == IslandState.Hidden)
+        {
+            return;
+        }
+
+        if (_activeSettingsWindow != null && _activeSettingsWindow.IsLoaded)
+        {
+            return;
+        }
+
+        if (!_hideTimer.IsEnabled)
+        {
+            _hideTimer.Start();
+        }
+    }
+
+    private void OnIslandMouseEnter(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        _hideTimer.Stop();
+        _isCursorInsideIsland = true;
+
+        if (_currentState == IslandState.Compact && !_isInteracting)
+        {
+            TransitionToState(IslandState.Expanded);
+        }
+    }
+
+    private void OnIslandMouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        _isCursorInsideIsland = false;
+        StartHideDelayIfNeeded();
+    }
+
+    public void TransitionToState(IslandState newState)
+    {
+        if (_currentState == newState && Visibility == (newState == IslandState.Hidden ? Visibility.Hidden : Visibility.Visible))
+        {
+            return;
+        }
+
+        _logger?.LogInformation($"Island state transition: {_currentState} -> {newState}");
+        var previousState = _currentState;
+        _currentState = newState;
+
+        AnimateStateTransition(previousState, newState);
+        IslandStateChanged?.Invoke(this, newState);
+    }
+
+    private void AnimateStateTransition(IslandState from, IslandState to)
+    {
+        var dims = _positionService.Dimensions;
+        var duration = TimeSpan.FromMilliseconds(dims.AnimationDurationMs);
+        var easing = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+
+        if (to == IslandState.Hidden)
+        {
+            var fadeOut = new DoubleAnimation(1.0, 0.0, duration) { EasingFunction = easing };
+            fadeOut.Completed += (s, e) =>
+            {
+                if (_currentState == IslandState.Hidden)
+                {
+                    Visibility = Visibility.Hidden;
+                    IslandContainer.Opacity = 1.0;
+                }
+            };
+            IslandContainer.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+            return;
+        }
+
+        if (Visibility != Visibility.Visible)
+        {
+            Reposition();
+            Visibility = Visibility.Visible;
+            IslandContainer.Opacity = 0.0;
+            var fadeIn = new DoubleAnimation(0.0, 1.0, duration) { EasingFunction = easing };
+            IslandContainer.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+        }
+
+        if (to == IslandState.Compact)
+        {
+            // Animate width, height, corner radius back to compact
+            AnimateIslandDimensions(dims.CompactWidth, dims.CompactHeight, dims.CompactCornerRadius, duration, easing);
+
+            // Cross-fade views: Compact visible, Expanded collapsed
+            CompactView.Visibility = Visibility.Visible;
+            var compactFade = new DoubleAnimation(CompactView.Opacity, 1.0, duration) { EasingFunction = easing };
+            CompactView.BeginAnimation(UIElement.OpacityProperty, compactFade);
+
+            var expandedFade = new DoubleAnimation(ExpandedView.Opacity, 0.0, duration) { EasingFunction = easing };
+            expandedFade.Completed += (s, e) =>
+            {
+                if (_currentState == IslandState.Compact)
+                {
+                    ExpandedView.Visibility = Visibility.Collapsed;
+                }
+            };
+            ExpandedView.BeginAnimation(UIElement.OpacityProperty, expandedFade);
+        }
+        else if (to == IslandState.Expanded || to == IslandState.SettingsOpen || to == IslandState.Library || to == IslandState.PlaylistTracks)
+        {
+            // Animate width, height, corner radius to expanded
+            AnimateIslandDimensions(dims.ExpandedWidth, dims.ExpandedHeight, dims.ExpandedCornerRadius, duration, easing);
+
+            // Cross-fade views: Expanded visible, Compact hidden
+            ExpandedView.Visibility = Visibility.Visible;
+            var expandedFade = new DoubleAnimation(ExpandedView.Opacity, 1.0, duration) { EasingFunction = easing };
+            ExpandedView.BeginAnimation(UIElement.OpacityProperty, expandedFade);
+
+            var compactFade = new DoubleAnimation(CompactView.Opacity, 0.0, duration) { EasingFunction = easing };
+            compactFade.Completed += (s, e) =>
+            {
+                if (_currentState != IslandState.Compact)
+                {
+                    CompactView.Visibility = Visibility.Collapsed;
+                }
+            };
+            CompactView.BeginAnimation(UIElement.OpacityProperty, compactFade);
+        }
+    }
+
+    private void AnimateIslandDimensions(double targetWidth, double targetHeight, double targetRadius, TimeSpan duration, IEasingFunction easing)
+    {
+        var widthAnim = new DoubleAnimation(IslandContainer.ActualWidth > 0 ? IslandContainer.ActualWidth : targetWidth, targetWidth, duration)
+        {
+            EasingFunction = easing
+        };
+
+        var heightAnim = new DoubleAnimation(IslandContainer.ActualHeight > 0 ? IslandContainer.ActualHeight : targetHeight, targetHeight, duration)
+        {
+            EasingFunction = easing
+        };
+
+        IslandContainer.BeginAnimation(FrameworkElement.WidthProperty, widthAnim);
+        IslandContainer.BeginAnimation(FrameworkElement.HeightProperty, heightAnim);
+        IslandContainer.CornerRadius = new CornerRadius(0, 0, targetRadius, targetRadius);
+    }
+
+    // ==========================================
+    // Compact & Header Menu Button Handlers
+    // ==========================================
+
+    private void SettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        _isInteracting = true;
+        _hideTimer.Stop();
+
+        try
+        {
+            if (_activeSettingsWindow == null || !_activeSettingsWindow.IsLoaded)
+            {
+                _activeSettingsWindow = new SettingsWindow
+                {
+                    Owner = this
+                };
+                _activeSettingsWindow.Closed += (s, args) =>
+                {
+                    _activeSettingsWindow = null;
+                    _isInteracting = false;
+                    StartHideDelayIfNeeded();
+                };
+                _activeSettingsWindow.Show();
+                TransitionToState(IslandState.SettingsOpen);
+            }
+            else
+            {
+                _activeSettingsWindow.Activate();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("Error opening SettingsWindow.", ex);
+            _isInteracting = false;
+        }
+    }
+
+    private void HomeEntryButton_Click(object sender, RoutedEventArgs e)
+    {
+        _isInteracting = true;
+        _hideTimer.Stop();
+
+        _logger?.LogInformation("Spotifly Home/Now Playing entry clicked.");
+        TransitionToState(IslandState.Expanded);
+
+        _isInteracting = false;
+    }
+
+    private void DismissButton_Click(object sender, RoutedEventArgs e)
+    {
+        _logger?.LogInformation("Dismiss X clicked: hiding island.");
+        _activationTimer.Stop();
+        _hideTimer.Stop();
+        TransitionToState(IslandState.Hidden);
     }
 
     public void ToggleVisibility()
     {
-        if (Visibility == Visibility.Visible)
+        if (_currentState == IslandState.Hidden)
         {
-            Hide();
-            _logger?.LogInformation("IslandView hidden via toggle.");
+            TransitionToState(IslandState.Compact);
         }
         else
         {
-            Reposition();
-            Show();
-            _logger?.LogInformation("IslandView made visible via toggle.");
+            TransitionToState(IslandState.Hidden);
         }
     }
 
@@ -175,6 +529,9 @@ public partial class IslandView : Window
         if (!_isDisposed)
         {
             _isDisposed = true;
+            _cursorPollingTimer.Stop();
+            _activationTimer.Stop();
+            _hideTimer.Stop();
             SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         }
 

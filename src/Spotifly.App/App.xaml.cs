@@ -75,7 +75,7 @@ public partial class App : System.Windows.Application
             });
         _lifecycleManager.RegisterDisposable(_trayIconService);
 
-        _logger.LogInformation("Spotifly Phase 2 Shell initialized with hidden IslandView overlay.");
+        _logger.LogInformation("Spotifly Phase 3 Shell initialized with IslandView overlay and hover triggers.");
     }
 
     private void OnSecondInstanceLaunched(object? sender, EventArgs e)

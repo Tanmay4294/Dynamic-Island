@@ -2,9 +2,44 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- Minimal Theme Defaults for Island Overlay -->
-    <SolidColorBrush x:Key="IslandBackgroundBrush" Color="#EE121212" />
-    <SolidColorBrush x:Key="IslandBorderBrush" Color="#44FFFFFF" />
+    <SolidColorBrush x:Key="IslandBackgroundBrush" Color="#EE141414" />
+    <SolidColorBrush x:Key="IslandBorderBrush" Color="#33FFFFFF" />
     <SolidColorBrush x:Key="IslandForegroundBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="IslandSecondaryForegroundBrush" Color="#B3B3B3" />
     <SolidColorBrush x:Key="IslandAccentBrush" Color="#1DB954" />
+    <SolidColorBrush x:Key="IslandButtonHoverBrush" Color="#26FFFFFF" />
+    <SolidColorBrush x:Key="IslandButtonPressedBrush" Color="#40FFFFFF" />
+
+    <!-- Style for Circular Vector Icon Buttons in Island -->
+    <Style x:Key="IslandCircleButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid Background="Transparent">
+                        <Border x:Name="HoverBackground"
+                                CornerRadius="18"
+                                Background="Transparent"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch" />
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="HoverBackground" Property="Background" Value="{DynamicResource IslandButtonHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="HoverBackground" Property="Background" Value="{DynamicResource IslandButtonPressedBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 
 </ResourceDictionary>

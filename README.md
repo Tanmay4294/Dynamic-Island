@@ -30,7 +30,7 @@ dotnet run --project src/Spotifly.App
 - [x] **Phase 0**: Repository and Environment Audit (Resolved .NET 8 LTS SDK environment and repository setup)
 - [x] **Phase 1**: Minimal WPF Shell and Single-Instance Behaviour
 - [x] **Phase 2**: Transparent Overlay Window and Semicircle Shape
-- [ ] **Phase 3**: Hover Trigger, Compact Menu and Expanded/Collapsed States
+- [x] **Phase 3**: Hover Trigger, Compact Menu and Expanded/Collapsed States
 - [ ] **Phase 4**: Theme System and Settings Window
 - [ ] **Phase 5**: Curved Semicircular Progress Control (Simulated Data First)
 - [ ] **Phase 6**: Spotify Authentication and API Connectivity Test
