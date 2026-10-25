@@ -50,7 +50,21 @@ dotnet run --project src/Spotifly.App
   - `429 Too Many Requests`: Honors `Retry-After` header and prevents spamming.
 - **UX Decision (Playlist View Retention)**: Spotifly deliberately keeps the user in the playlist song list upon starting playback rather than auto-switching back to Now Playing. This allows users to browse, explore, and queue subsequent tracks uninterrupted.
 - **Prerequisites for Manual Verification**: An active Spotify Premium subscription and an active Spotify player device (e.g., Spotify desktop or mobile app running with an active session).
-- [ ] **Phase 11**: Mouse-Wheel Mode Switching and Navigation Polish
+- [x] **Phase 11**: Mouse-Wheel Mode Switching and Navigation Polish
+
+## Phase 11: Mouse-Wheel Navigation & List Isolation
+- **Top-Level Navigation**:
+  - While viewing expanded **Now Playing**, scrolling up (`delta > 0`) switches to the **Playlists Library**.
+  - While viewing the **Playlists Library**, scrolling down (`delta < 0`) switches back to **Now Playing**.
+  - Direction mapping and debouncing/throttling (350ms window) prevent rapid touchpad gesture bursts from jittering or toggling views repeatedly.
+- **List Scroll Isolation**:
+  - Scrolling inside the playlist list (`PlaylistsScrollViewer`) or track list (`TracksScrollViewer`) handles scrolling directly on the list and stops event propagation (`e.Handled = true`), preventing accidental view flips.
+  - Normal list scrolling is never throttled or debounced.
+- **Navigation Controls & Polish**:
+  - Retained the song list **Back** button to return to Playlists with scroll position preserved.
+  - Preserved the compact middle **Spotifly** control to reliably open the expanded Now Playing view without altering compact menu structure.
+  - Added subtle, theme-aligned visual hint badge (`NavigationHintBadge`) indicating the current view and available wheel direction without cluttering the island.
+  - Ensured no autoplay occurs upon hover, focus, or selection.
 - [ ] **Phase 12**: Windows Startup, Settings Persistence and Recovery
 - [ ] **Phase 13**: Testing, Accessibility, Performance and Security
 - [ ] **Phase 14**: Packaging and Final Handoff

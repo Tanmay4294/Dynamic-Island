@@ -28,6 +28,7 @@ public partial class IslandView : Window
     private readonly ISpotifyAuthService? _authService;
     private readonly ISpotifyApiService? _apiService;
     private readonly ISpotifyService? _spotifyService;
+    private readonly IWheelNavigationService _wheelNavService;
     private readonly DispatcherTimer _playbackPollTimer;
     private readonly DispatcherTimer _toastTimer;
     private PlaylistInfo? _selectedPlaylist;
@@ -97,7 +98,8 @@ public partial class IslandView : Window
         ISimulatedProgressService? progressService = null,
         ISpotifyAuthService? authService = null,
         ISpotifyApiService? apiService = null,
-        ISpotifyService? spotifyService = null)
+        ISpotifyService? spotifyService = null,
+        IWheelNavigationService? wheelNavService = null)
     {
         _positionService = positionService;
         _logger = logger;
@@ -109,6 +111,7 @@ public partial class IslandView : Window
         _authService = authService;
         _apiService = apiService;
         _spotifyService = spotifyService;
+        _wheelNavService = wheelNavService ?? new WheelNavigationService();
 
         InitializeComponent();
 
@@ -176,6 +179,9 @@ public partial class IslandView : Window
             Interval = TimeSpan.FromMilliseconds(40)
         };
         _cursorPollingTimer.Tick += OnCursorPollTick;
+
+        // Top-level mouse-wheel listener for switching between Now Playing and Library (Phase 11)
+        PreviewMouseWheel += IslandView_PreviewMouseWheel;
 
         // Listen for screen resolution and display changes
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
@@ -558,6 +564,9 @@ public partial class IslandView : Window
             if (to == IslandState.Library)
             {
                 ExpandedTitleText.Text = "Playlists";
+                NavigationHintBadge.Visibility = Visibility.Visible;
+                NavigationHintText.Text = "Scroll for Now Playing";
+                NavigationHintIcon.Data = Geometry.Parse("M7.41,8.59L12,13.17L16.59,8.59L18,10L12,16L6,10L7.41,8.59Z"); // Down chevron
                 NowPlayingPanel.Visibility = Visibility.Collapsed;
                 PlaylistTracksPanel.Visibility = Visibility.Collapsed;
                 PlaylistsLibraryPanel.Visibility = Visibility.Visible;
@@ -566,6 +575,7 @@ public partial class IslandView : Window
             else if (to == IslandState.PlaylistTracks)
             {
                 ExpandedTitleText.Text = "Songs";
+                NavigationHintBadge.Visibility = Visibility.Collapsed; // Wheel mode switching disabled inside tracks
                 NowPlayingPanel.Visibility = Visibility.Collapsed;
                 PlaylistsLibraryPanel.Visibility = Visibility.Collapsed;
                 PlaylistTracksPanel.Visibility = Visibility.Visible;
@@ -577,6 +587,9 @@ public partial class IslandView : Window
             else
             {
                 ExpandedTitleText.Text = "Now Playing";
+                NavigationHintBadge.Visibility = Visibility.Visible;
+                NavigationHintText.Text = "Scroll for Playlists";
+                NavigationHintIcon.Data = Geometry.Parse("M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z"); // Up chevron
                 PlaylistsLibraryPanel.Visibility = Visibility.Collapsed;
                 PlaylistTracksPanel.Visibility = Visibility.Collapsed;
                 NowPlayingPanel.Visibility = Visibility.Visible;
@@ -1045,12 +1058,57 @@ public partial class IslandView : Window
 
     private void ScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        // Keep mouse-wheel scrolling confined inside the child list view, preventing outer layout triggers
+        // Phase 11: List scroll isolation.
+        // Inside playlist and song-list regions, the wheel must scroll the list only.
+        // Scroll directly and set e.Handled = true so it NEVER bubbles into the top-level mode switch handler.
         if (sender is System.Windows.Controls.ScrollViewer scroller)
         {
             scroller.ScrollToVerticalOffset(scroller.VerticalOffset - e.Delta);
             e.Handled = true;
         }
+    }
+
+    private void IslandView_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        // Top-level mouse-wheel navigation (Phase 11):
+        // Only active when expanded island is showing Now Playing or Library.
+        // If an inner ScrollViewer already handled the event, e.Handled is true and we don't switch.
+        if (e.Handled)
+        {
+            return;
+        }
+
+        // Check if cursor is over one of the list scroll viewers even if hit-tested on margin/scrollbar
+        if (IsOverScrollList(e.GetPosition(this)))
+        {
+            return;
+        }
+
+        if (_wheelNavService.TryHandleTopLevelWheel(e.Delta, _currentState, out var targetState))
+        {
+            _logger?.LogInformation($"Top-level wheel gesture detected (delta={e.Delta}). Switching {_currentState} -> {targetState}.");
+            TransitionToState(targetState);
+            e.Handled = true;
+        }
+    }
+
+    private bool IsOverScrollList(System.Windows.Point ptInWindow)
+    {
+        if (PlaylistsLibraryPanel.Visibility == Visibility.Visible && PlaylistsScrollViewer.IsVisible)
+        {
+            var bounds = PlaylistsScrollViewer.TransformToAncestor(this).TransformBounds(
+                new Rect(0, 0, PlaylistsScrollViewer.ActualWidth, PlaylistsScrollViewer.ActualHeight));
+            if (bounds.Contains(ptInWindow)) return true;
+        }
+
+        if (PlaylistTracksPanel.Visibility == Visibility.Visible && TracksScrollViewer.IsVisible)
+        {
+            var bounds = TracksScrollViewer.TransformToAncestor(this).TransformBounds(
+                new Rect(0, 0, TracksScrollViewer.ActualWidth, TracksScrollViewer.ActualHeight));
+            if (bounds.Contains(ptInWindow)) return true;
+        }
+
+        return false;
     }
 
     private void OpenPlaylistInSpotify_Click(object sender, RoutedEventArgs e)

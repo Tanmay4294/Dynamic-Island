@@ -127,15 +127,38 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <!-- Header bar in expanded view: view label & collapse action -->
+                    <!-- Header bar in expanded view: view label & navigation indicator & actions -->
                     <Grid Grid.Row="0" Margin="0,0,0,10">
-                        <TextBlock x:Name="ExpandedTitleText"
-                                   Text="Now Playing"
-                                   FontSize="11"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
-                                   HorizontalAlignment="Left"
-                                   VerticalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                            <TextBlock x:Name="ExpandedTitleText"
+                                       Text="Now Playing"
+                                       FontSize="11"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
+                                       VerticalAlignment="Center" />
+
+                            <!-- View Indicator / Wheel Hint (Phase 11) -->
+                            <Border x:Name="NavigationHintBadge"
+                                    Margin="8,0,0,0"
+                                    Padding="5,1"
+                                    CornerRadius="4"
+                                    Background="#14FFFFFF"
+                                    ToolTip="Scroll wheel or touchpad up/down to switch between Now Playing &amp; Playlists"
+                                    VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Path x:Name="NavigationHintIcon"
+                                          Fill="{DynamicResource IslandSecondaryForegroundBrush}"
+                                          Width="8" Height="8"
+                                          Stretch="Uniform"
+                                          Margin="0,0,3,0"
+                                          Data="M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z" />
+                                    <TextBlock x:Name="NavigationHintText"
+                                               Text="Scroll for Playlists"
+                                               FontSize="9"
+                                               Foreground="{DynamicResource IslandSecondaryForegroundBrush}" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <!-- Toggle Library / Now Playing Button -->
