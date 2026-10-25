@@ -36,7 +36,7 @@ public class SemicircleGeometryTests
     }
 
     [Fact]
-    public void CreateIslandGeometry_ExpandedMode_ProducesClosedPillStadiumGeometry()
+    public void CreateIslandGeometry_ExpandedMode_ProducesClosedSemicircularDomeGeometry()
     {
         var thread = new Thread(() =>
         {
@@ -45,9 +45,14 @@ public class SemicircleGeometryTests
             Assert.NotNull(geometry);
             Assert.Single(geometry.Figures);
             Assert.True(geometry.Figures[0].IsClosed);
+            Assert.True(geometry.Figures[0].IsFilled);
 
-            // Center of expanded island must be filled
-            Assert.True(geometry.FillContains(new Point(180, 75)), "Center of expanded island must be filled");
+            // Center of expanded island dome must be filled
+            Assert.True(geometry.FillContains(new Point(180, 75)), "Center of expanded island dome must be filled");
+
+            // Extreme bottom corners outside the semicircle contour must not be filled
+            Assert.False(geometry.FillContains(new Point(5, 145)), "Expanded bottom-left corner exterior must not be filled");
+            Assert.False(geometry.FillContains(new Point(355, 145)), "Expanded bottom-right corner exterior must not be filled");
         });
 
         thread.SetApartmentState(ApartmentState.STA);

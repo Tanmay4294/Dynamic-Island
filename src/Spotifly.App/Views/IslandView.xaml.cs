@@ -187,10 +187,11 @@ public partial class IslandView : Window
     }
 
     /// <summary>
-    /// Builds the vector geometry for the island: a flat top flush with the screen edge,
-    /// vertical sidewalls, and a smooth semicircular/elliptical bottom arc.
-    /// In Compact mode (250x55), an elliptical bottom arc gives an authentic semicircular dome.
-    /// In Expanded mode (360x150), corner arcs with a bottom flat span create a polished pill/stadium dome.
+    /// <summary>
+    /// Builds the vector geometry for the island in BOTH compact and expanded modes.
+    /// In both states, it renders an authentic semicircular / domed shape with:
+    /// - Flat top edge aligned flush against the top screen edge (y = 0)
+    /// - Smooth continuous curved bottom contour (ArcSegment) forming the dome
     /// </summary>
     public static PathGeometry CreateIslandGeometry(double width, double height, bool isCompact)
     {
@@ -201,47 +202,21 @@ public partial class IslandView : Window
             IsFilled = true
         };
 
-        if (isCompact)
-        {
-            // Flat top edge: (0,0) -> (width, 0)
-            figure.Segments.Add(new LineSegment(new System.Windows.Point(width, 0), true));
+        // Flat top edge: (0, 0) -> (width, 0)
+        figure.Segments.Add(new LineSegment(new System.Windows.Point(width, 0), true));
 
-            // Small vertical drop: (width, 0) -> (width, drop)
-            double drop = Math.Max(0, height * 0.15); // ~8px drop
-            figure.Segments.Add(new LineSegment(new System.Windows.Point(width, drop), true));
+        // Subtle vertical drop before arc initiates (maintains curvature integrity at edges)
+        double drop = isCompact ? Math.Max(0, height * 0.15) : Math.Max(0, height * 0.10);
+        figure.Segments.Add(new LineSegment(new System.Windows.Point(width, drop), true));
 
-            // Smooth curved bottom arc to left side: (width, drop) -> (0, drop)
-            // ArcSegment radiusX = width/2, radiusY = height - drop
-            figure.Segments.Add(new ArcSegment(
-                new System.Windows.Point(0, drop),
-                new System.Windows.Size(width / 2.0, height - drop),
-                0,
-                false,
-                SweepDirection.Clockwise,
-                true));
-        }
-        else
-        {
-            // Expanded stadium/pill dome with large corner radii
-            double radius = 30.0;
-            figure.Segments.Add(new LineSegment(new System.Windows.Point(width, 0), true));
-            figure.Segments.Add(new LineSegment(new System.Windows.Point(width, height - radius), true));
-            figure.Segments.Add(new ArcSegment(
-                new System.Windows.Point(width - radius, height),
-                new System.Windows.Size(radius, radius),
-                0,
-                false,
-                SweepDirection.Clockwise,
-                true));
-            figure.Segments.Add(new LineSegment(new System.Windows.Point(radius, height), true));
-            figure.Segments.Add(new ArcSegment(
-                new System.Windows.Point(0, height - radius),
-                new System.Windows.Size(radius, radius),
-                0,
-                false,
-                SweepDirection.Clockwise,
-                true));
-        }
+        // Continuous smooth curved bottom arc sweeping to the left side: (width, drop) -> (0, drop)
+        figure.Segments.Add(new ArcSegment(
+            new System.Windows.Point(0, drop),
+            new System.Windows.Size(width / 2.0, height - drop),
+            0,
+            false,
+            SweepDirection.Clockwise,
+            true));
 
         var geometry = new PathGeometry();
         geometry.Figures.Add(figure);

@@ -109,12 +109,13 @@
                 </Grid>
 
                 <!-- EXPANDED VIEW: Container for Now Playing / Library -->
+                <!-- Positioned within the semicircular dome curve with ergonomic side and bottom margins -->
                 <Grid x:Name="ExpandedView"
                       Visibility="Collapsed"
                       Opacity="0"
                       HorizontalAlignment="Stretch"
                       VerticalAlignment="Stretch"
-                      Margin="18,12,18,14">
+                      Margin="36,12,36,24">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
@@ -154,9 +155,10 @@
                     </Grid>
 
                     <!-- Expanded Body Area (Placeholder for Phase 7-10 Controls) -->
+                    <!-- Contained nicely in the lower portion of the dome -->
                     <Border Grid.Row="1"
                             Background="#18FFFFFF"
-                            CornerRadius="14"
+                            CornerRadius="18"
                             Padding="12"
                             VerticalAlignment="Stretch">
                         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
