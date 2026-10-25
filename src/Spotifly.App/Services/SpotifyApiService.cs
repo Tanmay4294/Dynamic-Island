@@ -6,7 +6,7 @@ using Spotifly.App.Models;
 
 namespace Spotifly.App.Services;
 
-public interface ISpotifyApiService
+public interface ISpotifyApiService : IDisposable
 {
     Task<SpotifyUserProfile?> GetCurrentUserProfileAsync(CancellationToken cancellationToken = default);
 }
@@ -16,12 +16,14 @@ public interface ISpotifyApiService
 /// Handles authentication injection, rate limits (HTTP 429 Retry-After), HTTP 401 token refresh,
 /// and safe error reporting.
 /// </summary>
-public sealed class SpotifyApiService : ISpotifyApiService
+public sealed class SpotifyApiService : ISpotifyApiService, IDisposable
 {
     private readonly ISpotifyAuthService _authService;
     private readonly SpotifyConfig _config;
     private readonly HttpClient _httpClient;
     private readonly ILoggerService? _logger;
+    private readonly bool _ownsHttpClient;
+    private bool _disposed;
 
     public SpotifyApiService(
         ISpotifyAuthService authService,
@@ -31,7 +33,8 @@ public sealed class SpotifyApiService : ISpotifyApiService
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _config = config ?? throw new ArgumentNullException(nameof(config));
-        _httpClient = httpClient ?? new HttpClient();
+        _ownsHttpClient = httpClient == null;
+        _httpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         _logger = logger;
     }
 
@@ -103,5 +106,16 @@ public sealed class SpotifyApiService : ISpotifyApiService
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         var profile = JsonSerializer.Deserialize<SpotifyUserProfile>(json);
         return profile;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        if (_ownsHttpClient)
+        {
+            _httpClient.Dispose();
+        }
     }
 }

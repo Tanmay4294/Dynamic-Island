@@ -65,7 +65,24 @@ dotnet run --project src/Spotifly.App
   - Preserved the compact middle **Spotifly** control to reliably open the expanded Now Playing view without altering compact menu structure.
   - Added subtle, theme-aligned visual hint badge (`NavigationHintBadge`) indicating the current view and available wheel direction without cluttering the island.
   - Ensured no autoplay occurs upon hover, focus, or selection.
-- [ ] **Phase 12**: Windows Startup, Settings Persistence and Recovery
+- [x] **Phase 12**: Windows Startup, Settings Persistence and Recovery
+
+## Phase 12: Startup, Recovery & Lifecycle Hardening
+- **Windows Startup**:
+  - Unpackaged, non-elevated per-user registration via `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+  - Idempotent configuration: repeated enable/disable calls never produce duplicate registry values or launch loops.
+  - Windows startup toggle in Settings actively queries and mirrors the underlying Windows registry configuration.
+- **Settings Persistence & Resilient Recovery**:
+  - Stores all preferences (`theme`, `activationDelayMs`, `hideDelayMs`, `horizontalOffset`, `verticalOffset`, `launchAtSignIn`) in `%LocalAppData%\Spotifly\settings.json`.
+  - Writes updates atomically via `.tmp` swap to prevent partial writes during sudden power-off.
+  - Validates and clamps all numeric ranges upon load; if JSON is malformed or corrupted, logs the issue, restores safe defaults without crashing, and saves a repaired file.
+- **Offline & Disconnected State**:
+  - Spotifly UI, controls, animations, and settings operate gracefully offline without Spotify connection.
+  - When disconnected or without internet, displays non-blocking status messages ("Spotify is idle", "Spotify not connected", "Network connection to Spotify failed"). Never crashes or hangs UI threads.
+- **Single-Instance & Clean Exit**:
+  - Protected by named system `Mutex` and `EventWaitHandle`; duplicate launches signal the existing instance to pop up a friendly tray balloon notification, then immediately terminate cleanly.
+  - Explicit **Exit** actions in Settings and system tray execute full cooperative shutdown: cancels background tokens, flushes settings, closes overlay, and disposes mutex and HTTP clients cleanly.
+  - The compact **X** button continues to dismiss/hide the island as designed and does not terminate the app.
 - [ ] **Phase 13**: Testing, Accessibility, Performance and Security
 - [ ] **Phase 14**: Packaging and Final Handoff
 

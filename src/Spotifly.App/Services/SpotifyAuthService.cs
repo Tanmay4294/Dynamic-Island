@@ -8,7 +8,7 @@ using Spotifly.App.Models;
 
 namespace Spotifly.App.Services;
 
-public interface ISpotifyAuthService
+public interface ISpotifyAuthService : IDisposable
 {
     bool IsConnected { get; }
     event EventHandler<bool>? ConnectionStatusChanged;
@@ -23,7 +23,7 @@ public interface ISpotifyAuthService
 /// opens the browser for user consent, validates CSRF state, exchanges code for tokens,
 /// and handles token refresh without ever using a client secret.
 /// </summary>
-public sealed class SpotifyAuthService : ISpotifyAuthService
+public sealed class SpotifyAuthService : ISpotifyAuthService, IDisposable
 {
     private readonly SpotifyConfig _config;
     private readonly ISecureTokenStore _tokenStore;
@@ -31,6 +31,8 @@ public sealed class SpotifyAuthService : ISpotifyAuthService
     private readonly ILoggerService? _logger;
     private SpotifyTokenData? _currentToken;
     private readonly SemaphoreSlim _tokenLock = new(1, 1);
+    private readonly bool _ownsHttpClient;
+    private bool _disposed;
 
     public bool IsConnected => _currentToken != null && !string.IsNullOrEmpty(_currentToken.AccessToken);
     public event EventHandler<bool>? ConnectionStatusChanged;
@@ -43,7 +45,8 @@ public sealed class SpotifyAuthService : ISpotifyAuthService
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _tokenStore = tokenStore ?? throw new ArgumentNullException(nameof(tokenStore));
-        _httpClient = httpClient ?? new HttpClient();
+        _ownsHttpClient = httpClient == null;
+        _httpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
         _logger = logger;
 
         // Attempt to load existing credentials
@@ -315,5 +318,18 @@ public sealed class SpotifyAuthService : ISpotifyAuthService
         _logger?.LogInformation("Disconnected from Spotify. Local credentials purged.");
         ConnectionStatusChanged?.Invoke(this, false);
         await Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        _tokenLock.Dispose();
+
+        if (_ownsHttpClient)
+        {
+            _httpClient.Dispose();
+        }
     }
 }

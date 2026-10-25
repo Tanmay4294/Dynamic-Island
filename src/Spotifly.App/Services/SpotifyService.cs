@@ -7,7 +7,7 @@ using Spotifly.App.Models;
 
 namespace Spotifly.App.Services;
 
-public interface ISpotifyService
+public interface ISpotifyService : IDisposable
 {
     PlaybackSnapshot CurrentPlayback { get; }
     IReadOnlyList<PlaylistInfo> CachedPlaylists { get; }
@@ -32,7 +32,7 @@ public interface ISpotifyService
 /// handles missing tracks, podcasts, inactive devices, rate limits (HTTP 429), and player command execution.
 /// Never reports a command successful unless the API returns 204 No Content.
 /// </summary>
-public sealed class SpotifyService : ISpotifyService
+public sealed class SpotifyService : ISpotifyService, IDisposable
 {
     private readonly ISpotifyAuthService _authService;
     private readonly SpotifyConfig _config;
@@ -44,6 +44,8 @@ public sealed class SpotifyService : ISpotifyService
     private readonly SemaphoreSlim _playlistLock = new(1, 1);
     private readonly Dictionary<string, (IReadOnlyList<TrackInfo> tracks, DateTime cachedAt)> _playlistTrackCache = new();
     private readonly SemaphoreSlim _trackLock = new(1, 1);
+    private readonly bool _ownsHttpClient;
+    private bool _disposed;
 
     public PlaybackSnapshot CurrentPlayback => _currentPlayback;
     public IReadOnlyList<PlaylistInfo> CachedPlaylists => _cachedPlaylists;
@@ -59,7 +61,8 @@ public sealed class SpotifyService : ISpotifyService
     {
         _authService = authService ?? throw new ArgumentNullException(nameof(authService));
         _config = config ?? throw new ArgumentNullException(nameof(config));
-        _httpClient = httpClient ?? new HttpClient();
+        _ownsHttpClient = httpClient == null;
+        _httpClient = httpClient ?? new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
         _logger = logger;
     }
 
@@ -775,5 +778,19 @@ public sealed class SpotifyService : ISpotifyService
     {
         _currentPlayback = snapshot;
         PlaybackChanged?.Invoke(this, snapshot);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+
+        _playlistLock.Dispose();
+        _trackLock.Dispose();
+
+        if (_ownsHttpClient)
+        {
+            _httpClient.Dispose();
+        }
     }
 }

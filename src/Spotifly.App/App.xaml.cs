@@ -75,6 +75,10 @@ public partial class App : System.Windows.Application
         _spotifyApiService = new SpotifyApiService(_spotifyAuthService, spotifyConfig, null, _logger);
         _spotifyService = new SpotifyService(_spotifyAuthService, spotifyConfig, null, _logger);
 
+        _lifecycleManager.RegisterDisposable(_spotifyService);
+        _lifecycleManager.RegisterDisposable(_spotifyApiService);
+        _lifecycleManager.RegisterDisposable(_spotifyAuthService);
+
         // Load saved theme and apply immediately before opening UI
         var currentSettings = _settingsService.CurrentSettings;
         _themeService.ApplyTheme(currentSettings.Theme);

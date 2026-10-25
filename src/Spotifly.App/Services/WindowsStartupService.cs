@@ -15,21 +15,25 @@ public interface IStartupService
 /// </summary>
 public sealed class WindowsStartupService : IStartupService
 {
-    private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string AppName = "Spotifly";
+    public const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    public const string AppName = "Spotifly";
+    private readonly string _runKeySubPath;
+    private readonly string _appName;
     private readonly ILoggerService? _logger;
 
-    public WindowsStartupService(ILoggerService? logger = null)
+    public WindowsStartupService(ILoggerService? logger = null, string runKeySubPath = RunKeyPath, string appName = AppName)
     {
         _logger = logger;
+        _runKeySubPath = runKeySubPath;
+        _appName = appName;
     }
 
     public bool IsLaunchAtStartupEnabled()
     {
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, false);
-            var value = key?.GetValue(AppName);
+            using var key = Registry.CurrentUser.OpenSubKey(_runKeySubPath, false);
+            var value = key?.GetValue(_appName);
             return value != null;
         }
         catch (Exception ex)
@@ -43,7 +47,8 @@ public sealed class WindowsStartupService : IStartupService
     {
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, true);
+            using var key = Registry.CurrentUser.OpenSubKey(_runKeySubPath, true) 
+                         ?? Registry.CurrentUser.CreateSubKey(_runKeySubPath, true);
             if (key == null)
             {
                 _logger?.LogWarning("Unable to open HKCU Run key for write access.");
@@ -55,16 +60,16 @@ public sealed class WindowsStartupService : IStartupService
                 var exePath = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
                 if (!string.IsNullOrEmpty(exePath))
                 {
-                    key.SetValue(AppName, $"\"{exePath}\"");
+                    key.SetValue(_appName, $"\"{exePath}\"");
                     _logger?.LogInformation($"Windows startup enabled: {exePath}");
                     return true;
                 }
             }
             else
             {
-                if (key.GetValue(AppName) != null)
+                if (key.GetValue(_appName) != null)
                 {
-                    key.DeleteValue(AppName, false);
+                    key.DeleteValue(_appName, false);
                     _logger?.LogInformation("Windows startup disabled.");
                 }
                 return true;

@@ -138,7 +138,9 @@ public sealed class SettingsService : ISettingsService
             }
 
             var json = JsonSerializer.Serialize(settings, JsonOptions);
-            File.WriteAllText(_settingsFilePath, json);
+            var tempPath = _settingsFilePath + ".tmp";
+            File.WriteAllText(tempPath, json);
+            File.Move(tempPath, _settingsFilePath, overwrite: true);
         }
         catch (Exception ex)
         {
