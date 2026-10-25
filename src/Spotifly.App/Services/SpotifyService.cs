@@ -17,6 +17,7 @@ public interface ISpotifyService
     Task<IReadOnlyList<PlaylistInfo>> GetUserPlaylistsAsync(bool forceRefresh = false, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TrackInfo>> GetPlaylistTracksAsync(string playlistId, bool forceRefresh = false, CancellationToken cancellationToken = default);
     Task<bool> PlayTrackAsync(string trackUri, string? contextUri = null, CancellationToken cancellationToken = default);
+    Task<PlaybackCommandResult> PlayTrackWithResultAsync(string trackUri, string? contextUri = null, CancellationToken cancellationToken = default);
     Task<bool> PlayAsync(CancellationToken cancellationToken = default);
     Task<bool> PauseAsync(CancellationToken cancellationToken = default);
     Task<bool> TogglePlayPauseAsync(CancellationToken cancellationToken = default);
@@ -628,19 +629,25 @@ public sealed class SpotifyService : ISpotifyService
 
     public async Task<bool> PlayTrackAsync(string trackUri, string? contextUri = null, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(trackUri)) return false;
+        var result = await PlayTrackWithResultAsync(trackUri, contextUri, cancellationToken);
+        return result.IsSuccess;
+    }
+
+    public async Task<PlaybackCommandResult> PlayTrackWithResultAsync(string trackUri, string? contextUri = null, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(trackUri))
+        {
+            return PlaybackCommandResult.GenericFailure("No track specified.");
+        }
 
         string? token = await _authService.GetValidAccessTokenAsync(cancellationToken);
         if (string.IsNullOrEmpty(token))
         {
             _logger?.LogWarning("Cannot play track: Not authenticated.");
-            return false;
+            return PlaybackCommandResult.Unauthorized();
         }
 
         string url = $"{_config.ApiBaseUrl}/me/player/play";
-        using var request = new HttpRequestMessage(HttpMethod.Put, url);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
         object body;
         if (!string.IsNullOrEmpty(contextUri))
         {
@@ -661,36 +668,107 @@ public sealed class SpotifyService : ISpotifyService
         }
 
         string jsonBody = JsonSerializer.Serialize(body);
-        request.Content = new StringContent(jsonBody, System.Text.Encoding.UTF8, "application/json");
 
         try
         {
+            using var request = new HttpRequestMessage(HttpMethod.Put, url);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            request.Content = new StringContent(jsonBody, System.Text.Encoding.UTF8, "application/json");
+
             using var response = await _httpClient.SendAsync(request, cancellationToken);
-            if (response.StatusCode == HttpStatusCode.NoContent) // 204
+
+            // Handle 401: Token refresh once
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
-                _logger?.LogInformation($"Initiated playback for track {trackUri} (HTTP 204).");
-                _ = Task.Run(async () =>
+                _logger?.LogWarning("PlayTrack returned 401. Refreshing token and retrying once.");
+                token = await _authService.GetValidAccessTokenAsync(cancellationToken);
+                if (string.IsNullOrEmpty(token))
                 {
-                    await Task.Delay(400, cancellationToken);
-                    await RefreshPlaybackAsync(cancellationToken);
-                }, cancellationToken);
-                return true;
+                    return PlaybackCommandResult.Unauthorized();
+                }
+
+                using var retryReq = new HttpRequestMessage(HttpMethod.Put, url);
+                retryReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                retryReq.Content = new StringContent(jsonBody, System.Text.Encoding.UTF8, "application/json");
+
+                using var retryRes = await _httpClient.SendAsync(retryReq, cancellationToken);
+                return await EvaluatePlaybackResponseAsync(retryRes, trackUri, cancellationToken);
             }
 
-            if (response.StatusCode == HttpStatusCode.NotFound) // 404
-            {
-                _logger?.LogWarning("PlayTrack failed: No active Spotify player device.");
-                return false;
-            }
-
-            _logger?.LogWarning($"PlayTrack returned HTTP {(int)response.StatusCode}.");
-            return false;
+            return await EvaluatePlaybackResponseAsync(response, trackUri, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogInformation("PlayTrack request was cancelled.");
+            return PlaybackCommandResult.GenericFailure("Request cancelled.");
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger?.LogError($"Network error during PlayTrack for {trackUri}.", ex);
+            return PlaybackCommandResult.Network(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Error executing PlayTrack for {trackUri}.", ex);
-            return false;
+            _logger?.LogError($"Unexpected error executing PlayTrack for {trackUri}.", ex);
+            return PlaybackCommandResult.GenericFailure(ex.Message);
         }
+    }
+
+    private async Task<PlaybackCommandResult> EvaluatePlaybackResponseAsync(HttpResponseMessage response, string trackUri, CancellationToken cancellationToken)
+    {
+        if (response.StatusCode == HttpStatusCode.NoContent) // 204
+        {
+            _logger?.LogInformation($"Initiated playback for track {trackUri} (HTTP 204).");
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(400, cancellationToken);
+                await RefreshPlaybackAsync(cancellationToken);
+            }, cancellationToken);
+            return PlaybackCommandResult.SuccessResult();
+        }
+
+        if (response.StatusCode == HttpStatusCode.NotFound) // 404
+        {
+            _logger?.LogWarning("PlayTrack failed: No active Spotify player device.");
+            return PlaybackCommandResult.NoDevice();
+        }
+
+        if (response.StatusCode == HttpStatusCode.Forbidden) // 403
+        {
+            _logger?.LogWarning("PlayTrack failed: Forbidden (Premium required or user restricted).");
+            return PlaybackCommandResult.Restricted();
+        }
+
+        if (response.StatusCode == (HttpStatusCode)429) // 429
+        {
+            int retrySec = 5;
+            if (response.Headers.TryGetValues("Retry-After", out var vals))
+            {
+                int.TryParse(vals.FirstOrDefault(), out retrySec);
+            }
+            _logger?.LogWarning($"PlayTrack failed: Rate limited (HTTP 429). Retry-After: {retrySec}s.");
+            return PlaybackCommandResult.RateLimited(retrySec);
+        }
+
+        var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        _logger?.LogWarning($"PlayTrack returned HTTP {(int)response.StatusCode}. Response: {errorBody}");
+
+        if (errorBody.Contains("NO_ACTIVE_DEVICE", StringComparison.OrdinalIgnoreCase))
+        {
+            return PlaybackCommandResult.NoDevice();
+        }
+
+        if (errorBody.Contains("PREMIUM_REQUIRED", StringComparison.OrdinalIgnoreCase))
+        {
+            return PlaybackCommandResult.Restricted();
+        }
+
+        if (errorBody.Contains("UNAVAILABLE", StringComparison.OrdinalIgnoreCase))
+        {
+            return PlaybackCommandResult.Unavailable();
+        }
+
+        return PlaybackCommandResult.GenericFailure($"Spotify returned HTTP {(int)response.StatusCode}.");
     }
 
     private void SetPlayback(PlaybackSnapshot snapshot)

@@ -507,6 +507,25 @@
                                     </Button>
                                 </Grid>
 
+                                <!-- Playback Status Toast Notification Banner (Phase 10) -->
+                                <Border x:Name="TracksToastBorder"
+                                        Grid.Row="0"
+                                        Background="#DD1A1A1A"
+                                        BorderBrush="{DynamicResource IslandAccentBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="8,4"
+                                        Margin="2,0,2,4"
+                                        Visibility="Collapsed"
+                                        HorizontalAlignment="Stretch">
+                                    <TextBlock x:Name="TracksToastText"
+                                               Text="Playback started."
+                                               FontSize="11"
+                                               Foreground="{DynamicResource IslandForegroundBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               HorizontalAlignment="Center" />
+                                </Border>
+
                                 <!-- Loading / Empty / Disconnected message overlay -->
                                 <StackPanel x:Name="TracksStatusContainer"
                                             Grid.Row="1"

@@ -37,7 +37,19 @@ dotnet run --project src/Spotifly.App
 - [x] **Phase 7**: Spotify Service: Now Playing, Playback and Album Art
 - [x] **Phase 8**: Spotify Playlist List with Cover Art
 - [x] **Phase 9**: Playlist Song List with Album Art
-- [ ] **Phase 10**: Click a Song to Play It
+- [x] **Phase 10**: Click a Song to Play It
+
+## Phase 10: Song Playback & UX Behavior
+- **Trigger**: Deliberate click on any track in the expanded playlist song list.
+- **Player API**: Sends `PUT https://api.spotify.com/v1/me/player/play` with the track's Spotify URI and parent playlist context URI. Never streams or downloads audio within Spotifly.
+- **Duplicate Prevention**: Immediate visual pending state on the clicked track row, temporary interaction lock, and automatic UI state restoration upon completion, error, or cancellation.
+- **Error & Edge Case Handling**:
+  - `401 Unauthorized`: Silent token refresh and one automatic retry; prompts reconnection if refresh fails.
+  - `403 Forbidden`: Displays clear notification indicating Premium requirement or permission restriction.
+  - `404 Not Found` / No Active Device: Notifies user to launch or activate playback on a Spotify device.
+  - `429 Too Many Requests`: Honors `Retry-After` header and prevents spamming.
+- **UX Decision (Playlist View Retention)**: Spotifly deliberately keeps the user in the playlist song list upon starting playback rather than auto-switching back to Now Playing. This allows users to browse, explore, and queue subsequent tracks uninterrupted.
+- **Prerequisites for Manual Verification**: An active Spotify Premium subscription and an active Spotify player device (e.g., Spotify desktop or mobile app running with an active session).
 - [ ] **Phase 11**: Mouse-Wheel Mode Switching and Navigation Polish
 - [ ] **Phase 12**: Windows Startup, Settings Persistence and Recovery
 - [ ] **Phase 13**: Testing, Accessibility, Performance and Security

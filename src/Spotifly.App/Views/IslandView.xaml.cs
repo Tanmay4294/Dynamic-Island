@@ -29,8 +29,10 @@ public partial class IslandView : Window
     private readonly ISpotifyApiService? _apiService;
     private readonly ISpotifyService? _spotifyService;
     private readonly DispatcherTimer _playbackPollTimer;
+    private readonly DispatcherTimer _toastTimer;
     private PlaylistInfo? _selectedPlaylist;
     private double _lastPlaylistVerticalOffset;
+    private bool _isPlaybackRequestInProgress;
     private bool _isDisposed;
 
     // State machine
@@ -142,6 +144,17 @@ public partial class IslandView : Window
             Interval = TimeSpan.FromMilliseconds(3500)
         };
         _playbackPollTimer.Tick += OnPlaybackPollTick;
+
+        // Non-blocking toast notification dismissal timer (Phase 10)
+        _toastTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(3)
+        };
+        _toastTimer.Tick += (s, e) =>
+        {
+            _toastTimer.Stop();
+            TracksToastBorder.Visibility = Visibility.Collapsed;
+        };
 
         // 1. Activation timer: triggers after cursor stays in top zone for ActivationDelayMs
         _activationTimer = new DispatcherTimer
@@ -981,12 +994,53 @@ public partial class IslandView : Window
     {
         if (_spotifyService == null || string.IsNullOrEmpty(track.Uri)) return;
 
-        _logger?.LogInformation($"Playing selected track: {track.Name} ({track.Uri}).");
-        bool success = await _spotifyService.PlayTrackAsync(track.Uri, _selectedPlaylist?.Uri);
-        if (!success)
+        // Prevent duplicate concurrent requests (Phase 10)
+        if (_isPlaybackRequestInProgress)
         {
-            _logger?.LogWarning("Playback could not be started directly. Track may be restricted or no active player was found.");
+            _logger?.LogInformation("Playback request already in progress; ignoring duplicate click.");
+            return;
         }
+
+        _isPlaybackRequestInProgress = true;
+        TracksScrollViewer.IsEnabled = false; // Disable list clicks during request
+        ShowToast($"Starting \"{track.Name}\"...", isError: false);
+
+        try
+        {
+            _logger?.LogInformation($"Initiating playback for track: {track.Name} ({track.Uri}).");
+            var result = await _spotifyService.PlayTrackWithResultAsync(track.Uri, _selectedPlaylist?.Uri);
+
+            if (result.IsSuccess)
+            {
+                ShowToast($"Playing: {track.Name}", isError: false);
+                // UX decision documented: Keep user in playlist view without forcibly switching to Now Playing
+            }
+            else
+            {
+                _logger?.LogWarning($"Playback attempt failed: {result.Message}");
+                ShowToast(result.Message, isError: true);
+            }
+        }
+        finally
+        {
+            // Restore UI interactivity on success, failure, or cancellation
+            _isPlaybackRequestInProgress = false;
+            TracksScrollViewer.IsEnabled = true;
+        }
+    }
+
+    private void ShowToast(string message, bool isError)
+    {
+        Dispatcher.InvokeAsync(() =>
+        {
+            _toastTimer.Stop();
+            TracksToastText.Text = message;
+            TracksToastBorder.BorderBrush = isError
+                ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 107, 107))
+                : (System.Windows.Media.Brush)FindResource("IslandAccentBrush");
+            TracksToastBorder.Visibility = Visibility.Visible;
+            _toastTimer.Start();
+        });
     }
 
     private void ScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
