@@ -83,7 +83,32 @@ dotnet run --project src/Spotifly.App
   - Protected by named system `Mutex` and `EventWaitHandle`; duplicate launches signal the existing instance to pop up a friendly tray balloon notification, then immediately terminate cleanly.
   - Explicit **Exit** actions in Settings and system tray execute full cooperative shutdown: cancels background tokens, flushes settings, closes overlay, and disposes mutex and HTTP clients cleanly.
   - The compact **X** button continues to dismiss/hide the island as designed and does not terminate the app.
-- [ ] **Phase 13**: Testing, Accessibility, Performance and Security
+- [x] **Phase 13**: Testing, Accessibility, Performance and Security
+
+## Phase 13: Quality, Security, Accessibility & Performance
+- **Automated Test Matrix (95 Unit Tests across net8.0)**:
+  - First-launch disconnected state, authorized/cancelled/revoked token handling.
+  - Inactive/no device states, HTTP 401, 403, 429 (`Retry-After`), and 5xx server resilience.
+  - Playlist pagination, missing cover artwork, episodes, and null item filtering without crashes.
+  - Multi-DPI resolution scaling, top-level wheel direction, touchpad debouncing, and list scroll isolation.
+  - Settings corruption recovery, atomic file swaps, Windows startup idempotency, and named mutex single-instance enforcement.
+- **Security & Privacy**:
+  - Zero hardcoded client secrets or tokens in source code or output binaries.
+  - OAuth 2.0 PKCE flow with high-entropy verifier and DPAPI Windows-protected local token storage.
+  - Automatic structured log scrubbing with compiled regular expressions redacting Bearer tokens, authorization codes, and sensitive parameters.
+  - Clean `.gitignore` strictly omitting user credentials, settings files, caches, and build outputs.
+  - Zero telemetry, analytics, third-party network trackers, or dynamic remote script execution.
+- **Accessibility & Usability**:
+  - Full keyboard focusability with high-contrast dashed visual focus rectangles (`IslandCircleButtonStyle`).
+  - Added programmatic `AutomationProperties.Name` across all interactive buttons for screen readers.
+  - Meaningful tooltips on all icon-only buttons (`Settings`, `Spotifly Home`, `Dismiss`, `Play/Pause`, `Next`, `Previous`, `Refresh`, `Back`).
+  - Information architecture avoids communicating state purely through color (distinct icons, chevrons, and descriptive text badges).
+- **Performance & Lifecycle Optimization**:
+  - Artwork decoding explicitly constrained with `DecodePixelWidth = 124` (2x native 62 DIP container) and `.Freeze()` for fast GPU blitting without memory bloat.
+  - Avoids re-decoding bitmaps on unchanged tracks across playback poll intervals.
+  - Bounded HTTP timeouts (10–15s) and `CancellationToken` support throughout all background tasks.
+  - Non-polling cursor tracking and playback polling paused entirely when island is hidden.
+- [ ] **Phase 14**: Packaging and Final Handoff
 - [ ] **Phase 14**: Packaging and Final Handoff
 
 ## Spotify Developer Dashboard Configuration (Phase 6)

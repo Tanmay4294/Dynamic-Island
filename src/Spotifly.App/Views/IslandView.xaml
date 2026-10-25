@@ -67,6 +67,7 @@
                             Grid.Column="0"
                             Width="32" Height="32"
                             ToolTip="Spotifly Settings"
+                            AutomationProperties.Name="Spotifly Settings"
                             Style="{DynamicResource IslandCircleButtonStyle}"
                             Click="SettingsButton_Click">
                         <!-- Gear Vector Path -->
@@ -82,6 +83,7 @@
                             Height="32"
                             Margin="4,0,4,0"
                             ToolTip="Spotifly Home / Now Playing"
+                            AutomationProperties.Name="Spotifly Home and Now Playing"
                             Style="{DynamicResource IslandCircleButtonStyle}"
                             Click="HomeEntryButton_Click">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -104,6 +106,7 @@
                             Grid.Column="2"
                             Width="32" Height="32"
                             ToolTip="Dismiss Island (Esc)"
+                            AutomationProperties.Name="Dismiss Island"
                             Style="{DynamicResource IslandCircleButtonStyle}"
                             Click="DismissButton_Click">
                         <!-- X Vector Path -->
@@ -165,6 +168,7 @@
                             <Button x:Name="LibraryToggleButton"
                                     Width="24" Height="24"
                                     ToolTip="Your Playlists"
+                                    AutomationProperties.Name="Toggle Playlists and Now Playing"
                                     Style="{DynamicResource IslandCircleButtonStyle}"
                                     Click="LibraryToggleButton_Click">
                                 <Path Fill="{DynamicResource IslandSecondaryForegroundBrush}"
@@ -175,6 +179,7 @@
                             <Button Width="24" Height="24"
                                     Margin="4,0,0,0"
                                     ToolTip="Settings"
+                                    AutomationProperties.Name="Open Settings"
                                     Style="{DynamicResource IslandCircleButtonStyle}"
                                     Click="SettingsButton_Click">
                                 <Path Fill="{DynamicResource IslandSecondaryForegroundBrush}"
@@ -185,6 +190,7 @@
                             <Button Width="24" Height="24"
                                     Margin="4,0,0,0"
                                     ToolTip="Dismiss Island"
+                                    AutomationProperties.Name="Dismiss Expanded Island"
                                     Style="{DynamicResource IslandCircleButtonStyle}"
                                     Click="DismissButton_Click">
                                 <Path Fill="{DynamicResource IslandSecondaryForegroundBrush}"
@@ -292,6 +298,7 @@
                                         <Button x:Name="PreviousTrackButton"
                                                 Width="28" Height="28"
                                                 ToolTip="Previous Track"
+                                                AutomationProperties.Name="Previous Track"
                                                 Style="{DynamicResource IslandCircleButtonStyle}"
                                                 Click="PreviousTrackButton_Click">
                                             <Path Fill="{DynamicResource IslandForegroundBrush}"
@@ -305,6 +312,7 @@
                                                 Width="32" Height="32"
                                                 Margin="8,0,8,0"
                                                 ToolTip="Play / Pause"
+                                                AutomationProperties.Name="Play or Pause"
                                                 Background="{DynamicResource IslandAccentBrush}"
                                                 Style="{DynamicResource IslandCircleButtonStyle}"
                                                 Click="PlayPauseButton_Click">
@@ -319,6 +327,7 @@
                                         <Button x:Name="NextTrackButton"
                                                 Width="28" Height="28"
                                                 ToolTip="Next Track"
+                                                AutomationProperties.Name="Next Track"
                                                 Style="{DynamicResource IslandCircleButtonStyle}"
                                                 Click="NextTrackButton_Click">
                                             <Path Fill="{DynamicResource IslandForegroundBrush}"
@@ -368,6 +377,7 @@
                                             Width="22" Height="22"
                                             HorizontalAlignment="Right"
                                             ToolTip="Refresh Playlists"
+                                            AutomationProperties.Name="Refresh Playlists"
                                             Style="{DynamicResource IslandCircleButtonStyle}"
                                             Click="RefreshPlaylistsButton_Click">
                                         <Path Fill="{DynamicResource IslandSecondaryForegroundBrush}"
@@ -498,6 +508,7 @@
                                                 Width="22" Height="22"
                                                 Margin="0,0,6,0"
                                                 ToolTip="Back to Playlists"
+                                                AutomationProperties.Name="Back to Playlists"
                                                 Style="{DynamicResource IslandCircleButtonStyle}"
                                                 Click="BackToPlaylistsButton_Click">
                                             <Path Fill="{DynamicResource IslandSecondaryForegroundBrush}"
@@ -521,6 +532,7 @@
                                             Width="22" Height="22"
                                             HorizontalAlignment="Right"
                                             ToolTip="Refresh Songs"
+                                            AutomationProperties.Name="Refresh Songs"
                                             Style="{DynamicResource IslandCircleButtonStyle}"
                                             Click="RefreshTracksButton_Click">
                                         <Path Fill="{DynamicResource IslandSecondaryForegroundBrush}"

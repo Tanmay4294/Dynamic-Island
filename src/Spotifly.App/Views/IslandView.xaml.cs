@@ -34,6 +34,7 @@ public partial class IslandView : Window
     private PlaylistInfo? _selectedPlaylist;
     private double _lastPlaylistVerticalOffset;
     private bool _isPlaybackRequestInProgress;
+    private string? _currentArtworkUrl;
     private bool _isDisposed;
 
     // State machine
@@ -758,25 +759,32 @@ public partial class IslandView : Window
             PlaybackDeviceText.ToolTip = snapshot.StatusMessage;
         }
 
-        // Album Artwork loading & caching
+        // Album Artwork loading & caching (avoids re-decoding when track artwork hasn't changed)
         if (track.HasArtwork && !string.IsNullOrEmpty(track.ArtworkUrl))
         {
-            try
+            if (_currentArtworkUrl != track.ArtworkUrl)
             {
-                var bitmap = new System.Windows.Media.Imaging.BitmapImage();
-                bitmap.BeginInit();
-                bitmap.UriSource = new Uri(track.ArtworkUrl, UriKind.Absolute);
-                bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-                bitmap.EndInit();
-                AlbumArtworkImage.Source = bitmap;
-            }
-            catch
-            {
-                AlbumArtworkImage.Source = null;
+                _currentArtworkUrl = track.ArtworkUrl;
+                try
+                {
+                    var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(track.ArtworkUrl, UriKind.Absolute);
+                    bitmap.DecodePixelWidth = 124; // Performance: decode at 2x native display size (62 DIP * 2)
+                    bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                    bitmap.EndInit();
+                    bitmap.Freeze(); // Performance: freeze bitmap to allow cross-thread access and fast GPU blitting
+                    AlbumArtworkImage.Source = bitmap;
+                }
+                catch
+                {
+                    AlbumArtworkImage.Source = null;
+                }
             }
         }
         else
         {
+            _currentArtworkUrl = null;
             AlbumArtworkImage.Source = null;
         }
     }
