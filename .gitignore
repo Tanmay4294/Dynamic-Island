@@ -1,0 +1,37 @@
+## Visual Studio / .NET
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+_ReSharper*/
+*.VC.db
+*.opendb
+
+## Local application data & credentials
+settings.json
+*.token
+*.credential
+*.secret
+local.settings.json
+appsettings.local.json
+Spotifly.log
+Spotifly.*.log
+logs/
+
+## Test and coverage output
+TestResults/
+[Tt]est[Rr]esult*/
+*.trx
+coverage/
+
+## OS Clutter
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
