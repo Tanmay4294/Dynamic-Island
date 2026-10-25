@@ -138,7 +138,19 @@
                                    VerticalAlignment="Center" />
 
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <!-- Toggle Library / Now Playing Button -->
+                            <Button x:Name="LibraryToggleButton"
+                                    Width="24" Height="24"
+                                    ToolTip="Your Playlists"
+                                    Style="{DynamicResource IslandCircleButtonStyle}"
+                                    Click="LibraryToggleButton_Click">
+                                <Path Fill="{DynamicResource IslandSecondaryForegroundBrush}"
+                                      Width="12" Height="12"
+                                      Stretch="Uniform"
+                                      Data="M4,6H2V20A2,2 0 0,0 4,22H18V20H4M20,2H8A2,2 0 0,0 6,4V16A2,2 0 0,0 8,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2M20,16H8V4H20M10,9V11H18V9M10,6V8H18V6M10,12V14H15V12" />
+                            </Button>
                             <Button Width="24" Height="24"
+                                    Margin="4,0,0,0"
                                     ToolTip="Settings"
                                     Style="{DynamicResource IslandCircleButtonStyle}"
                                     Click="SettingsButton_Click">
@@ -160,148 +172,285 @@
                         </StackPanel>
                     </Grid>
 
-                    <!-- Expanded Body Area: Spotify Now Playing & Controls (Phase 7) -->
+                    <!-- Expanded Body Area: Spotify Now Playing (Phase 7) or Playlists Library (Phase 8) -->
                     <!-- Contained ergonomically inside the lower portion of the semicircular dome -->
-                    <Border Grid.Row="1"
-                            Background="#18FFFFFF"
-                            BorderBrush="#22FFFFFF"
-                            BorderThickness="1"
-                            CornerRadius="16"
-                            Padding="12"
-                            VerticalAlignment="Stretch">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <!-- Album Artwork Column -->
-                                <ColumnDefinition Width="68" />
-                                <!-- Track Info & Playback Controls Column -->
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
+                    <Grid Grid.Row="1">
+                        <!-- 1. Now Playing Body Panel -->
+                        <Border x:Name="NowPlayingPanel"
+                                Background="#18FFFFFF"
+                                BorderBrush="#22FFFFFF"
+                                BorderThickness="1"
+                                CornerRadius="16"
+                                Padding="12"
+                                VerticalAlignment="Stretch">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <!-- Album Artwork Column -->
+                                    <ColumnDefinition Width="68" />
+                                    <!-- Track Info & Playback Controls Column -->
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
 
-                            <!-- Artwork with rounded corners and missing-artwork fallback -->
-                            <Border Grid.Column="0"
-                                    Width="62" Height="62"
-                                    HorizontalAlignment="Left"
-                                    VerticalAlignment="Center"
-                                    CornerRadius="10"
-                                    ClipToBounds="True"
-                                    Background="#262626"
-                                    BorderBrush="#33FFFFFF"
-                                    BorderThickness="1"
-                                    Cursor="Hand"
-                                    ToolTip="Open in Spotify"
-                                    MouseLeftButtonUp="Artwork_MouseLeftButtonUp">
-                                <Grid>
-                                    <!-- Fallback Music Note / Disc vector when artwork is missing or loading -->
-                                    <Path Fill="{DynamicResource IslandSecondaryForegroundBrush}"
-                                          Width="24" Height="24"
-                                          HorizontalAlignment="Center"
-                                          VerticalAlignment="Center"
-                                          Stretch="Uniform"
-                                          Data="M12,3V13.55C11.41,13.21 10.73,13 10,13C7.79,13 6,14.79 6,17C6,19.21 7.79,21 10,21C12.21,21 14,19.21 14,17V7H18V3H12Z" />
-                                    <!-- Dynamic Album Artwork Image -->
-                                    <Image x:Name="AlbumArtworkImage"
-                                           Stretch="UniformToFill"
-                                           RenderOptions.BitmapScalingMode="HighQuality" />
-                                </Grid>
-                            </Border>
+                                <!-- Artwork with rounded corners and missing-artwork fallback -->
+                                <Border Grid.Column="0"
+                                        Width="62" Height="62"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center"
+                                        CornerRadius="10"
+                                        ClipToBounds="True"
+                                        Background="#262626"
+                                        BorderBrush="#33FFFFFF"
+                                        BorderThickness="1"
+                                        Cursor="Hand"
+                                        ToolTip="Open in Spotify"
+                                        MouseLeftButtonUp="Artwork_MouseLeftButtonUp">
+                                    <Grid>
+                                        <!-- Fallback Music Note / Disc vector when artwork is missing or loading -->
+                                        <Path Fill="{DynamicResource IslandSecondaryForegroundBrush}"
+                                              Width="24" Height="24"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Stretch="Uniform"
+                                              Data="M12,3V13.55C11.41,13.21 10.73,13 10,13C7.79,13 6,14.79 6,17C6,19.21 7.79,21 10,21C12.21,21 14,19.21 14,17V7H18V3H12Z" />
+                                        <!-- Dynamic Album Artwork Image -->
+                                        <Image x:Name="AlbumArtworkImage"
+                                               Stretch="UniformToFill"
+                                               RenderOptions.BitmapScalingMode="HighQuality" />
+                                    </Grid>
+                                </Border>
 
-                            <!-- Track details, Spotify badge, and Media Playback Controls -->
-                            <Grid Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
+                                <!-- Track details, Spotify badge, and Media Playback Controls -->
+                                <Grid Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
 
-                                <!-- Row 0: Track Title + Clickable Spotify Logo Attribution -->
-                                <Grid Grid.Row="0">
-                                    <TextBlock x:Name="TrackTitleText"
-                                               Text="No Track Playing"
-                                               FontSize="13"
-                                               FontWeight="Bold"
-                                               Foreground="{DynamicResource IslandForegroundBrush}"
+                                    <!-- Row 0: Track Title + Clickable Spotify Logo Attribution -->
+                                    <Grid Grid.Row="0">
+                                        <TextBlock x:Name="TrackTitleText"
+                                                   Text="No Track Playing"
+                                                   FontSize="13"
+                                                   FontWeight="Bold"
+                                                   Foreground="{DynamicResource IslandForegroundBrush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
+                                                   Margin="0,0,22,0" />
+
+                                        <!-- Spotify Brand Attribution Icon (Open track in Spotify) -->
+                                        <Button x:Name="OpenInSpotifyButton"
+                                                Width="18" Height="18"
+                                                HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                ToolTip="Open track in Spotify"
+                                                Style="{DynamicResource IslandCircleButtonStyle}"
+                                                Click="OpenInSpotifyButton_Click">
+                                            <Path Fill="{DynamicResource IslandAccentBrush}"
+                                                  Width="14" Height="14"
+                                                  Stretch="Uniform"
+                                                  Data="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M16.59,16.43C16.41,16.72 16.03,16.81 15.74,16.63C13.39,15.2 10.43,14.88 6.95,15.67C6.62,15.75 6.29,15.54 6.21,15.21C6.13,14.88 6.34,14.55 6.67,14.47C10.48,13.6 13.75,13.96 16.39,15.58C16.68,15.76 16.77,16.14 16.59,16.43M17.81,13.71C17.58,14.08 17.1,14.2 16.73,13.97C14.04,12.32 9.94,11.84 6.76,12.81C6.35,12.93 5.91,12.7 5.79,12.29C5.67,11.88 5.9,11.44 6.31,11.32C9.94,10.22 14.47,10.75 17.55,12.65C17.92,12.88 18.04,13.36 17.81,13.71M17.92,10.88C14.69,8.95 9.38,8.78 6.3,9.71C5.81,9.86 5.29,9.58 5.14,9.09C4.99,8.6 5.27,8.08 5.76,7.93C9.3,6.86 15.17,7.07 18.88,9.28C19.32,9.54 19.46,10.11 19.2,10.55C18.94,11 18.36,11.14 17.92,10.88Z" />
+                                        </Button>
+                                    </Grid>
+
+                                    <!-- Row 1: Artist & Album -->
+                                    <TextBlock x:Name="TrackArtistText"
+                                               Grid.Row="1"
+                                               Text="Spotify is idle"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
                                                TextTrimming="CharacterEllipsis"
                                                ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
-                                               Margin="0,0,22,0" />
+                                               Margin="0,2,0,6" />
 
-                                    <!-- Spotify Brand Attribution Icon (Open track in Spotify) -->
-                                    <Button x:Name="OpenInSpotifyButton"
-                                            Width="18" Height="18"
+                                    <!-- Row 2: Media Playback Transport Controls -->
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left">
+                                        <!-- Previous Track Button -->
+                                        <Button x:Name="PreviousTrackButton"
+                                                Width="28" Height="28"
+                                                ToolTip="Previous Track"
+                                                Style="{DynamicResource IslandCircleButtonStyle}"
+                                                Click="PreviousTrackButton_Click">
+                                            <Path Fill="{DynamicResource IslandForegroundBrush}"
+                                                  Width="11" Height="11"
+                                                  Stretch="Uniform"
+                                                  Data="M6,6H8V18H6M9.5,12L18,18V6L9.5,12Z" />
+                                        </Button>
+
+                                        <!-- Play / Pause Button -->
+                                        <Button x:Name="PlayPauseButton"
+                                                Width="32" Height="32"
+                                                Margin="8,0,8,0"
+                                                ToolTip="Play / Pause"
+                                                Background="{DynamicResource IslandAccentBrush}"
+                                                Style="{DynamicResource IslandCircleButtonStyle}"
+                                                Click="PlayPauseButton_Click">
+                                            <Path x:Name="PlayPauseIconPath"
+                                                  Fill="#000000"
+                                                  Width="13" Height="13"
+                                                  Stretch="Uniform"
+                                                  Data="M8,5.14V19.14L19,12.14L8,5.14Z" />
+                                        </Button>
+
+                                        <!-- Next Track Button -->
+                                        <Button x:Name="NextTrackButton"
+                                                Width="28" Height="28"
+                                                ToolTip="Next Track"
+                                                Style="{DynamicResource IslandCircleButtonStyle}"
+                                                Click="NextTrackButton_Click">
+                                            <Path Fill="{DynamicResource IslandForegroundBrush}"
+                                                  Width="11" Height="11"
+                                                  Stretch="Uniform"
+                                                  Data="M16,18H18V6H16M6,6L14.5,12L6,18V6Z" />
+                                        </Button>
+
+                                        <!-- Status / Device indicator -->
+                                        <TextBlock x:Name="PlaybackDeviceText"
+                                                   FontSize="10"
+                                                   Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="12,0,0,0"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   MaxWidth="85" />
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </Border>
+
+                        <!-- 2. Playlists Library Panel (Phase 8) -->
+                        <Border x:Name="PlaylistsLibraryPanel"
+                                Visibility="Collapsed"
+                                Background="#18FFFFFF"
+                                BorderBrush="#22FFFFFF"
+                                BorderThickness="1"
+                                CornerRadius="16"
+                                Padding="8,6"
+                                VerticalAlignment="Stretch">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <!-- Library Sub-header with Refresh action and count -->
+                                <Grid Grid.Row="0" Margin="4,0,4,6">
+                                    <TextBlock x:Name="PlaylistCountText"
+                                               Text="Your Playlists"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
+                                               VerticalAlignment="Center" />
+
+                                    <Button x:Name="RefreshPlaylistsButton"
+                                            Width="22" Height="22"
                                             HorizontalAlignment="Right"
-                                            VerticalAlignment="Center"
-                                            ToolTip="Open track in Spotify"
+                                            ToolTip="Refresh Playlists"
                                             Style="{DynamicResource IslandCircleButtonStyle}"
-                                            Click="OpenInSpotifyButton_Click">
-                                        <Path Fill="{DynamicResource IslandAccentBrush}"
-                                              Width="14" Height="14"
+                                            Click="RefreshPlaylistsButton_Click">
+                                        <Path Fill="{DynamicResource IslandSecondaryForegroundBrush}"
+                                              Width="11" Height="11"
                                               Stretch="Uniform"
-                                              Data="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M16.59,16.43C16.41,16.72 16.03,16.81 15.74,16.63C13.39,15.2 10.43,14.88 6.95,15.67C6.62,15.75 6.29,15.54 6.21,15.21C6.13,14.88 6.34,14.55 6.67,14.47C10.48,13.6 13.75,13.96 16.39,15.58C16.68,15.76 16.77,16.14 16.59,16.43M17.81,13.71C17.58,14.08 17.1,14.2 16.73,13.97C14.04,12.32 9.94,11.84 6.76,12.81C6.35,12.93 5.91,12.7 5.79,12.29C5.67,11.88 5.9,11.44 6.31,11.32C9.94,10.22 14.47,10.75 17.55,12.65C17.92,12.88 18.04,13.36 17.81,13.71M17.92,10.88C14.69,8.95 9.38,8.78 6.3,9.71C5.81,9.86 5.29,9.58 5.14,9.09C4.99,8.6 5.27,8.08 5.76,7.93C9.3,6.86 15.17,7.07 18.88,9.28C19.32,9.54 19.46,10.11 19.2,10.55C18.94,11 18.36,11.14 17.92,10.88Z" />
+                                              Data="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z" />
                                     </Button>
                                 </Grid>
 
-                                <!-- Row 1: Artist & Album -->
-                                <TextBlock x:Name="TrackArtistText"
+                                <!-- Loading / Empty / Disconnected message overlay -->
+                                <TextBlock x:Name="PlaylistsStatusText"
                                            Grid.Row="1"
-                                           Text="Spotify is idle"
-                                           FontSize="11"
+                                           Text="Loading your playlists..."
+                                           FontSize="12"
                                            Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
-                                           TextTrimming="CharacterEllipsis"
-                                           ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
-                                           Margin="0,2,0,6" />
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Visibility="Collapsed" />
 
-                                <!-- Row 2: Media Playback Transport Controls -->
-                                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left">
-                                    <!-- Previous Track Button -->
-                                    <Button x:Name="PreviousTrackButton"
-                                            Width="28" Height="28"
-                                            ToolTip="Previous Track"
-                                            Style="{DynamicResource IslandCircleButtonStyle}"
-                                            Click="PreviousTrackButton_Click">
-                                        <Path Fill="{DynamicResource IslandForegroundBrush}"
-                                              Width="11" Height="11"
-                                              Stretch="Uniform"
-                                              Data="M6,6H8V18H6M9.5,12L18,18V6L9.5,12Z" />
-                                    </Button>
+                                <!-- Scrollable Playlist Rows Collection -->
+                                <ScrollViewer x:Name="PlaylistsScrollViewer"
+                                              Grid.Row="1"
+                                              VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsControl x:Name="PlaylistsItemsControl">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Margin="2,2,2,4"
+                                                        Padding="6,4"
+                                                        CornerRadius="8"
+                                                        Background="#12FFFFFF"
+                                                        Cursor="Hand"
+                                                        MouseLeftButtonUp="PlaylistItem_MouseLeftButtonUp">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Style.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter Property="Background" Value="{DynamicResource IslandButtonHoverBrush}" />
+                                                                </Trigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
 
-                                    <!-- Play / Pause Button -->
-                                    <Button x:Name="PlayPauseButton"
-                                            Width="32" Height="32"
-                                            Margin="8,0,8,0"
-                                            ToolTip="Play / Pause"
-                                            Background="{DynamicResource IslandAccentBrush}"
-                                            Style="{DynamicResource IslandCircleButtonStyle}"
-                                            Click="PlayPauseButton_Click">
-                                        <Path x:Name="PlayPauseIconPath"
-                                              Fill="#000000"
-                                              Width="13" Height="13"
-                                              Stretch="Uniform"
-                                              Data="M8,5.14V19.14L19,12.14L8,5.14Z" />
-                                    </Button>
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <!-- Cover Thumbnail -->
+                                                            <ColumnDefinition Width="34" />
+                                                            <!-- Name and Track Count -->
+                                                            <ColumnDefinition Width="*" />
+                                                            <!-- Open in Spotify Icon -->
+                                                            <ColumnDefinition Width="24" />
+                                                        </Grid.ColumnDefinitions>
 
-                                    <!-- Next Track Button -->
-                                    <Button x:Name="NextTrackButton"
-                                            Width="28" Height="28"
-                                            ToolTip="Next Track"
-                                            Style="{DynamicResource IslandCircleButtonStyle}"
-                                            Click="NextTrackButton_Click">
-                                        <Path Fill="{DynamicResource IslandForegroundBrush}"
-                                              Width="11" Height="11"
-                                              Stretch="Uniform"
-                                              Data="M16,18H18V6H16M6,6L14.5,12L6,18V6Z" />
-                                    </Button>
+                                                        <!-- Playlist Cover Thumbnail -->
+                                                        <Border Grid.Column="0"
+                                                                Width="30" Height="30"
+                                                                CornerRadius="4"
+                                                                ClipToBounds="True"
+                                                                Background="#282828">
+                                                            <Grid>
+                                                                <Path Fill="{DynamicResource IslandSecondaryForegroundBrush}"
+                                                                      Width="14" Height="14"
+                                                                      HorizontalAlignment="Center"
+                                                                      VerticalAlignment="Center"
+                                                                      Stretch="Uniform"
+                                                                      Data="M15,6H3V8H15V6M15,10H3V12H15V10M3,16H11V14H3V16M17,6V14.18C16.69,14.07 16.35,14 16,14A3,3 0 0,0 13,17A3,3 0 0,0 16,20A3,3 0 0,0 19,17V8H22V6H17Z" />
+                                                                <Image Source="{Binding CoverImageUrl}"
+                                                                       Stretch="UniformToFill"
+                                                                       RenderOptions.BitmapScalingMode="HighQuality" />
+                                                            </Grid>
+                                                        </Border>
 
-                                    <!-- Status / Device indicator -->
-                                    <TextBlock x:Name="PlaybackDeviceText"
-                                               FontSize="10"
-                                               Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
-                                               VerticalAlignment="Center"
-                                               Margin="12,0,0,0"
-                                               TextTrimming="CharacterEllipsis"
-                                               MaxWidth="85" />
-                                </StackPanel>
+                                                        <!-- Name & Details -->
+                                                        <StackPanel Grid.Column="1" Margin="8,0,4,0" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding Name}"
+                                                                       FontSize="12"
+                                                                       FontWeight="SemiBold"
+                                                                       Foreground="{DynamicResource IslandForegroundBrush}"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       ToolTip="{Binding Name}" />
+                                                            <TextBlock Text="{Binding TotalTracks, StringFormat='{}{0} tracks'}"
+                                                                       FontSize="10"
+                                                                       Foreground="{DynamicResource IslandSecondaryForegroundBrush}" />
+                                                        </StackPanel>
+
+                                                        <!-- Open in Spotify Action Button -->
+                                                        <Button Grid.Column="2"
+                                                                Width="20" Height="20"
+                                                                ToolTip="Open in Spotify"
+                                                                Style="{DynamicResource IslandCircleButtonStyle}"
+                                                                Click="OpenPlaylistInSpotify_Click"
+                                                                Tag="{Binding}">
+                                                            <Path Fill="{DynamicResource IslandAccentBrush}"
+                                                                  Width="12" Height="12"
+                                                                  Stretch="Uniform"
+                                                                  Data="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M16.59,16.43C16.41,16.72 16.03,16.81 15.74,16.63C13.39,15.2 10.43,14.88 6.95,15.67C6.62,15.75 6.29,15.54 6.21,15.21C6.13,14.88 6.34,14.55 6.67,14.47C10.48,13.6 13.75,13.96 16.39,15.58C16.68,15.76 16.77,16.14 16.59,16.43M17.81,13.71C17.58,14.08 17.1,14.2 16.73,13.97C14.04,12.32 9.94,11.84 6.76,12.81C6.35,12.93 5.91,12.7 5.79,12.29C5.67,11.88 5.9,11.44 6.31,11.32C9.94,10.22 14.47,10.75 17.55,12.65C17.92,12.88 18.04,13.36 17.81,13.71M17.92,10.88C14.69,8.95 9.38,8.78 6.3,9.71C5.81,9.86 5.29,9.58 5.14,9.09C4.99,8.6 5.27,8.08 5.76,7.93C9.3,6.86 15.17,7.07 18.88,9.28C19.32,9.54 19.46,10.11 19.2,10.55C18.94,11 18.36,11.14 17.92,10.88Z" />
+                                                        </Button>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
                             </Grid>
-                        </Grid>
-                    </Border>
+                        </Border>
+                    </Grid>
                 </Grid>
             </Grid>
         </Grid>

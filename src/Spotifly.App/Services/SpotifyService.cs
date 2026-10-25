@@ -10,8 +10,11 @@ namespace Spotifly.App.Services;
 public interface ISpotifyService
 {
     PlaybackSnapshot CurrentPlayback { get; }
+    IReadOnlyList<PlaylistInfo> CachedPlaylists { get; }
     event EventHandler<PlaybackSnapshot>? PlaybackChanged;
+    event EventHandler<IReadOnlyList<PlaylistInfo>>? PlaylistsChanged;
     Task<PlaybackSnapshot> RefreshPlaybackAsync(CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<PlaylistInfo>> GetUserPlaylistsAsync(bool forceRefresh = false, CancellationToken cancellationToken = default);
     Task<bool> PlayAsync(CancellationToken cancellationToken = default);
     Task<bool> PauseAsync(CancellationToken cancellationToken = default);
     Task<bool> TogglePlayPauseAsync(CancellationToken cancellationToken = default);
@@ -33,9 +36,15 @@ public sealed class SpotifyService : ISpotifyService
     private readonly HttpClient _httpClient;
     private readonly ILoggerService? _logger;
     private PlaybackSnapshot _currentPlayback = PlaybackSnapshot.Empty;
+    private IReadOnlyList<PlaylistInfo> _cachedPlaylists = Array.Empty<PlaylistInfo>();
+    private DateTime _lastPlaylistFetchUtc = DateTime.MinValue;
+    private readonly SemaphoreSlim _playlistLock = new(1, 1);
 
     public PlaybackSnapshot CurrentPlayback => _currentPlayback;
+    public IReadOnlyList<PlaylistInfo> CachedPlaylists => _cachedPlaylists;
+
     public event EventHandler<PlaybackSnapshot>? PlaybackChanged;
+    public event EventHandler<IReadOnlyList<PlaylistInfo>>? PlaylistsChanged;
 
     public SpotifyService(
         ISpotifyAuthService authService,
@@ -378,6 +387,131 @@ public sealed class SpotifyService : ISpotifyService
                 catch { }
             }
         }
+    }
+
+    public async Task<IReadOnlyList<PlaylistInfo>> GetUserPlaylistsAsync(bool forceRefresh = false, CancellationToken cancellationToken = default)
+    {
+        await _playlistLock.WaitAsync(cancellationToken);
+        try
+        {
+            // Return cached playlists if fresh (less than 5 minutes old) and forceRefresh is false
+            if (!forceRefresh && _cachedPlaylists.Count > 0 && DateTime.UtcNow - _lastPlaylistFetchUtc < TimeSpan.FromMinutes(5))
+            {
+                return CachedPlaylists;
+            }
+
+            string? token = await _authService.GetValidAccessTokenAsync(cancellationToken);
+            if (string.IsNullOrEmpty(token))
+            {
+                _logger?.LogWarning("Cannot retrieve user playlists: not authenticated.");
+                return Array.Empty<PlaylistInfo>();
+            }
+
+            var allPlaylists = new List<PlaylistInfo>();
+            int limit = 50;
+            int offset = 0;
+            string? nextUrl = $"{_config.ApiBaseUrl}/me/playlists?limit={limit}&offset={offset}";
+
+            while (!string.IsNullOrEmpty(nextUrl))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                using var request = new HttpRequestMessage(HttpMethod.Get, nextUrl);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+                if (response.StatusCode == (HttpStatusCode)429) // Rate limit
+                {
+                    _logger?.LogWarning("Spotify rate limit encountered while paging playlists (HTTP 429).");
+                    break;
+                }
+
+                if (response.StatusCode == HttpStatusCode.Unauthorized) // 401
+                {
+                    token = await _authService.GetValidAccessTokenAsync(cancellationToken);
+                    if (string.IsNullOrEmpty(token)) break;
+
+                    using var retryReq = new HttpRequestMessage(HttpMethod.Get, nextUrl);
+                    retryReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                    using var retryRes = await _httpClient.SendAsync(retryReq, cancellationToken);
+                    if (!retryRes.IsSuccessStatusCode) break;
+                    nextUrl = await ProcessPlaylistPageAsync(retryRes, allPlaylists, cancellationToken);
+                    continue;
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger?.LogWarning($"Playlist request failed with HTTP {(int)response.StatusCode}.");
+                    break;
+                }
+
+                nextUrl = await ProcessPlaylistPageAsync(response, allPlaylists, cancellationToken);
+            }
+
+            _cachedPlaylists = allPlaylists;
+            _lastPlaylistFetchUtc = DateTime.UtcNow;
+            _logger?.LogInformation($"Retrieved and cached {allPlaylists.Count} playlists from Spotify.");
+            PlaylistsChanged?.Invoke(this, CachedPlaylists);
+            return CachedPlaylists;
+        }
+        catch (OperationCanceledException)
+        {
+            _logger?.LogInformation("Playlist retrieval was cancelled.");
+            return CachedPlaylists;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("Error retrieving Spotify user playlists.", ex);
+            return CachedPlaylists;
+        }
+        finally
+        {
+            _playlistLock.Release();
+        }
+    }
+
+    private static async Task<string?> ProcessPlaylistPageAsync(
+        HttpResponseMessage response,
+        List<PlaylistInfo> accumulator,
+        CancellationToken cancellationToken)
+    {
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var page = JsonSerializer.Deserialize<SpotifyPlaylistsResponse>(json);
+        if (page?.Items != null)
+        {
+            foreach (var item in page.Items)
+            {
+                if (item == null || string.IsNullOrEmpty(item.Id)) continue;
+
+                string? coverUrl = null;
+                if (item.Images != null && item.Images.Count > 0)
+                {
+                    coverUrl = item.Images[0].Url;
+                }
+
+                string? webUrl = null;
+                if (item.ExternalUrls != null && item.ExternalUrls.TryGetValue("spotify", out var url))
+                {
+                    webUrl = url;
+                }
+
+                accumulator.Add(new PlaylistInfo
+                {
+                    Id = item.Id,
+                    Uri = item.Uri ?? $"spotify:playlist:{item.Id}",
+                    Name = !string.IsNullOrWhiteSpace(item.Name) ? item.Name : "Untitled Playlist",
+                    Description = item.Description,
+                    CoverImageUrl = coverUrl,
+                    SpotifyWebUrl = webUrl,
+                    TotalTracks = item.Tracks?.Total ?? 0,
+                    OwnerName = item.Owner?.DisplayName,
+                    IsCollaborative = item.Collaborative
+                });
+            }
+        }
+
+        return page?.Next;
     }
 
     private void SetPlayback(PlaybackSnapshot snapshot)

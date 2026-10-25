@@ -24,12 +24,14 @@ public sealed class SpotifyConfig
     public string RedirectUri => $"http://127.0.0.1:{LoopbackPort}/callback";
 
     /// <summary>
-    /// Scopes needed for Spotifly playback reading and player controls:
+    /// Scopes needed for Spotifly playback reading, controls, and playlist library:
     /// - user-read-private, user-read-email (User Profile & Account status)
     /// - user-read-playback-state (Currently playing track, album art, progress, device)
     /// - user-modify-playback-state (Play, Pause, Next, Previous)
+    /// - playlist-read-private (User's private and followed playlists)
+    /// - playlist-read-collaborative (Collaborative playlists)
     /// </summary>
-    public string Scopes => "user-read-private user-read-email user-read-playback-state user-modify-playback-state";
+    public string Scopes => "user-read-private user-read-email user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative";
 
     /// <summary>
     /// Accounts service authorize URL.

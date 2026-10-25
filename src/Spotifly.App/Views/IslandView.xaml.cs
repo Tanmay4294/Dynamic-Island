@@ -539,6 +539,21 @@ public partial class IslandView : Window
         }
         else if (to == IslandState.Expanded || to == IslandState.SettingsOpen || to == IslandState.Library || to == IslandState.PlaylistTracks)
         {
+            // Set sub-panel visibility according to target state
+            if (to == IslandState.Library)
+            {
+                ExpandedTitleText.Text = "Playlists";
+                NowPlayingPanel.Visibility = Visibility.Collapsed;
+                PlaylistsLibraryPanel.Visibility = Visibility.Visible;
+                _ = LoadPlaylistsAsync();
+            }
+            else
+            {
+                ExpandedTitleText.Text = "Now Playing";
+                PlaylistsLibraryPanel.Visibility = Visibility.Collapsed;
+                NowPlayingPanel.Visibility = Visibility.Visible;
+            }
+
             // Animate width & height to expanded and update expanded stadium geometry
             AnimateIslandDimensions(dims.ExpandedWidth, dims.ExpandedHeight, isCompact: false, duration, easing);
 
@@ -782,6 +797,95 @@ public partial class IslandView : Window
     private void Artwork_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         OpenInSpotifyButton_Click(sender, e);
+    }
+
+    private void LibraryToggleButton_Click(object sender, RoutedEventArgs e)
+    {
+        _isInteracting = true;
+        _hideTimer.Stop();
+
+        if (_currentState == IslandState.Library)
+        {
+            // Switch back to Now Playing expanded view
+            TransitionToState(IslandState.Expanded);
+        }
+        else
+        {
+            // Switch to Playlists Library view
+            TransitionToState(IslandState.Library);
+        }
+
+        _isInteracting = false;
+        StartHideDelayIfNeeded();
+    }
+
+    private async Task LoadPlaylistsAsync(bool forceRefresh = false)
+    {
+        if (_spotifyService == null) return;
+
+        PlaylistsStatusText.Visibility = Visibility.Visible;
+        PlaylistsStatusText.Text = "Loading your playlists...";
+
+        try
+        {
+            var playlists = await _spotifyService.GetUserPlaylistsAsync(forceRefresh);
+            PlaylistsItemsControl.ItemsSource = playlists;
+
+            if (playlists == null || playlists.Count == 0)
+            {
+                PlaylistsStatusText.Text = (_authService?.IsConnected ?? false)
+                    ? "No playlists found in your library."
+                    : "Spotify not connected. Open Settings to connect.";
+                PlaylistsStatusText.Visibility = Visibility.Visible;
+                PlaylistCountText.Text = "Playlists (0)";
+            }
+            else
+            {
+                PlaylistsStatusText.Visibility = Visibility.Collapsed;
+                PlaylistCountText.Text = $"Playlists ({playlists.Count})";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError("Error loading playlists.", ex);
+            PlaylistsStatusText.Text = "Failed to load playlists.";
+            PlaylistsStatusText.Visibility = Visibility.Visible;
+        }
+    }
+
+    private async void RefreshPlaylistsButton_Click(object sender, RoutedEventArgs e)
+    {
+        _isInteracting = true;
+        _hideTimer.Stop();
+
+        await LoadPlaylistsAsync(forceRefresh: true);
+
+        _isInteracting = false;
+        StartHideDelayIfNeeded();
+    }
+
+    private void PlaylistItem_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement elem && elem.DataContext is PlaylistInfo playlist)
+        {
+            _logger?.LogInformation($"Selected playlist: {playlist.Name} ({playlist.Id}). Transitioning to PlaylistTracks state.");
+            // Clean navigation handoff to PlaylistTracks state for Phase 9
+            TransitionToState(IslandState.PlaylistTracks);
+        }
+    }
+
+    private void OpenPlaylistInSpotify_Click(object sender, RoutedEventArgs e)
+    {
+        _isInteracting = true;
+        _hideTimer.Stop();
+
+        if (sender is FrameworkElement elem && elem.Tag is PlaylistInfo playlist)
+        {
+            _spotifyService?.OpenSpotifyUriOrWeb(playlist.Uri, playlist.SpotifyWebUrl);
+        }
+
+        _isInteracting = false;
+        StartHideDelayIfNeeded();
     }
 
     private void HomeEntryButton_Click(object sender, RoutedEventArgs e)
