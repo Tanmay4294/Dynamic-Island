@@ -27,6 +27,8 @@ public partial class IslandView : Window
     private readonly ISimulatedProgressService? _progressService;
     private readonly ISpotifyAuthService? _authService;
     private readonly ISpotifyApiService? _apiService;
+    private readonly ISpotifyService? _spotifyService;
+    private readonly DispatcherTimer _playbackPollTimer;
     private bool _isDisposed;
 
     // State machine
@@ -90,7 +92,8 @@ public partial class IslandView : Window
         IAppLifecycleManager? lifecycleManager = null,
         ISimulatedProgressService? progressService = null,
         ISpotifyAuthService? authService = null,
-        ISpotifyApiService? apiService = null)
+        ISpotifyApiService? apiService = null,
+        ISpotifyService? spotifyService = null)
     {
         _positionService = positionService;
         _logger = logger;
@@ -101,6 +104,7 @@ public partial class IslandView : Window
         _progressService = progressService;
         _authService = authService;
         _apiService = apiService;
+        _spotifyService = spotifyService;
 
         InitializeComponent();
 
@@ -122,6 +126,20 @@ public partial class IslandView : Window
                 });
             };
         }
+
+        // Spotify playback updates (Phase 7)
+        if (_spotifyService != null)
+        {
+            _spotifyService.PlaybackChanged += OnPlaybackChanged;
+            UpdatePlaybackUI(_spotifyService.CurrentPlayback);
+        }
+
+        // Lightweight playback poll timer: polls every 3.5 seconds only when island is visible
+        _playbackPollTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(3500)
+        };
+        _playbackPollTimer.Tick += OnPlaybackPollTick;
 
         // 1. Activation timer: triggers after cursor stays in top zone for ActivationDelayMs
         _activationTimer = new DispatcherTimer
@@ -474,6 +492,7 @@ public partial class IslandView : Window
 
         if (to == IslandState.Hidden)
         {
+            _playbackPollTimer.Stop();
             var fadeOut = new DoubleAnimation(1.0, 0.0, duration) { EasingFunction = easing };
             fadeOut.Completed += (s, e) =>
             {
@@ -491,6 +510,8 @@ public partial class IslandView : Window
         {
             Reposition();
             Visibility = Visibility.Visible;
+            _playbackPollTimer.Start();
+            _ = _spotifyService?.RefreshPlaybackAsync();
             IslandContainer.Opacity = 0.0;
             var fadeIn = new DoubleAnimation(0.0, 1.0, duration) { EasingFunction = easing };
             IslandContainer.BeginAnimation(UIElement.OpacityProperty, fadeIn);
@@ -635,6 +656,134 @@ public partial class IslandView : Window
         }
     }
 
+    private void OnPlaybackPollTick(object? sender, EventArgs e)
+    {
+        if (_currentState != IslandState.Hidden && Visibility == Visibility.Visible && _spotifyService != null)
+        {
+            _ = _spotifyService.RefreshPlaybackAsync();
+        }
+    }
+
+    private void OnPlaybackChanged(object? sender, PlaybackSnapshot snapshot)
+    {
+        Dispatcher.InvokeAsync(() => UpdatePlaybackUI(snapshot));
+    }
+
+    private void UpdatePlaybackUI(PlaybackSnapshot snapshot)
+    {
+        var track = snapshot.Track;
+
+        TrackTitleText.Text = track.Name;
+        TrackArtistText.Text = track.ArtistName;
+
+        // Play/Pause Icon state: Pause icon when playing, Play triangle when paused
+        if (snapshot.IsPlaying)
+        {
+            // Pause icon (two vertical bars)
+            PlayPauseIconPath.Data = Geometry.Parse("M14,19H18V5H14M6,19H10V5H6V19Z");
+            PlayPauseButton.ToolTip = "Pause";
+        }
+        else
+        {
+            // Play icon (right-pointing triangle)
+            PlayPauseIconPath.Data = Geometry.Parse("M8,5.14V19.14L19,12.14L8,5.14Z");
+            PlayPauseButton.ToolTip = "Play";
+        }
+
+        // Active playback device info
+        if (!string.IsNullOrEmpty(snapshot.DeviceName))
+        {
+            PlaybackDeviceText.Text = snapshot.DeviceName;
+            PlaybackDeviceText.ToolTip = $"Active Device: {snapshot.DeviceName} ({snapshot.DeviceType ?? "Player"})";
+        }
+        else
+        {
+            PlaybackDeviceText.Text = snapshot.StatusMessage ?? "Idle";
+            PlaybackDeviceText.ToolTip = snapshot.StatusMessage;
+        }
+
+        // Album Artwork loading & caching
+        if (track.HasArtwork && !string.IsNullOrEmpty(track.ArtworkUrl))
+        {
+            try
+            {
+                var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                bitmap.BeginInit();
+                bitmap.UriSource = new Uri(track.ArtworkUrl, UriKind.Absolute);
+                bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                bitmap.EndInit();
+                AlbumArtworkImage.Source = bitmap;
+            }
+            catch
+            {
+                AlbumArtworkImage.Source = null;
+            }
+        }
+        else
+        {
+            AlbumArtworkImage.Source = null;
+        }
+    }
+
+    private async void PlayPauseButton_Click(object sender, RoutedEventArgs e)
+    {
+        _isInteracting = true;
+        _hideTimer.Stop();
+
+        if (_spotifyService != null)
+        {
+            await _spotifyService.TogglePlayPauseAsync();
+        }
+
+        _isInteracting = false;
+        StartHideDelayIfNeeded();
+    }
+
+    private async void NextTrackButton_Click(object sender, RoutedEventArgs e)
+    {
+        _isInteracting = true;
+        _hideTimer.Stop();
+
+        if (_spotifyService != null)
+        {
+            await _spotifyService.NextAsync();
+        }
+
+        _isInteracting = false;
+        StartHideDelayIfNeeded();
+    }
+
+    private async void PreviousTrackButton_Click(object sender, RoutedEventArgs e)
+    {
+        _isInteracting = true;
+        _hideTimer.Stop();
+
+        if (_spotifyService != null)
+        {
+            await _spotifyService.PreviousAsync();
+        }
+
+        _isInteracting = false;
+        StartHideDelayIfNeeded();
+    }
+
+    private void OpenInSpotifyButton_Click(object sender, RoutedEventArgs e)
+    {
+        _isInteracting = true;
+        _hideTimer.Stop();
+
+        var track = _spotifyService?.CurrentPlayback.Track;
+        _spotifyService?.OpenSpotifyUriOrWeb(track?.Uri, track?.SpotifyWebUrl);
+
+        _isInteracting = false;
+        StartHideDelayIfNeeded();
+    }
+
+    private void Artwork_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        OpenInSpotifyButton_Click(sender, e);
+    }
+
     private void HomeEntryButton_Click(object sender, RoutedEventArgs e)
     {
         _isInteracting = true;
@@ -674,6 +823,7 @@ public partial class IslandView : Window
             _cursorPollingTimer.Stop();
             _activationTimer.Stop();
             _hideTimer.Stop();
+            _playbackPollTimer.Stop();
             SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         }
 

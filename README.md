@@ -34,7 +34,7 @@ dotnet run --project src/Spotifly.App
 - [x] **Phase 4**: Theme System and Settings Window
 - [x] **Phase 5**: Curved Semicircular Progress Control (Simulated Data First)
 - [x] **Phase 6**: Spotify Authentication and API Connectivity Test
-- [ ] **Phase 7**: Spotify Service: Now Playing, Playback and Album Art
+- [x] **Phase 7**: Spotify Service: Now Playing, Playback and Album Art
 - [ ] **Phase 8**: Spotify Playlist List with Cover Art
 - [ ] **Phase 9**: Playlist Song List with Album Art
 - [ ] **Phase 10**: Click a Song to Play It
@@ -56,7 +56,8 @@ To enable real Spotify authentication with Spotifly:
    - Add your Spotify account email to the **Users Allowlist**.
    - Development Mode allows up to 5 authorized users, and the app creator must have an active Spotify Premium account.
 5. Save the changes in the dashboard.
-6. In Spotifly Settings, click **Connect Spotify**. Your default browser will open to Spotify's authorization page. Click **Agree**; Spotify will redirect to the local loopback server, exchange the PKCE code for tokens, encrypt them via Windows DPAPI, and immediately verify the connection via `GET /v1/me`.
+6. In Spotifly Settings, click **Connect Spotify** (or **Reconnect**). Your default browser will open to Spotify's authorization page. Click **Agree**; Spotify will redirect to the local loopback server, exchange the PKCE code for tokens with playback scopes (`user-read-playback-state user-modify-playback-state`), encrypt them via Windows DPAPI, and immediately verify connectivity.
+
 
 > [!IMPORTANT]
 > **Mandatory Policy Checkpoint before Phase 7 / Live Playback Binding**:

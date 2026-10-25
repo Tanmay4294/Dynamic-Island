@@ -24,10 +24,12 @@ public sealed class SpotifyConfig
     public string RedirectUri => $"http://127.0.0.1:{LoopbackPort}/callback";
 
     /// <summary>
-    /// Only minimal scopes needed for Phase 6 connectivity test (GET /v1/me).
-    /// Playback and playlist scopes are deliberately deferred until later phases.
+    /// Scopes needed for Spotifly playback reading and player controls:
+    /// - user-read-private, user-read-email (User Profile & Account status)
+    /// - user-read-playback-state (Currently playing track, album art, progress, device)
+    /// - user-modify-playback-state (Play, Pause, Next, Previous)
     /// </summary>
-    public string Scopes => "user-read-private user-read-email";
+    public string Scopes => "user-read-private user-read-email user-read-playback-state user-modify-playback-state";
 
     /// <summary>
     /// Accounts service authorize URL.

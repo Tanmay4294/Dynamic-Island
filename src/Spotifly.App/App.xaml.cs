@@ -25,6 +25,7 @@ public partial class App : System.Windows.Application
     private ISecureTokenStore? _tokenStore;
     private ISpotifyAuthService? _spotifyAuthService;
     private ISpotifyApiService? _spotifyApiService;
+    private ISpotifyService? _spotifyService;
     private TrayIconService? _trayIconService;
     private IslandView? _islandView;
 
@@ -67,11 +68,12 @@ public partial class App : System.Windows.Application
         _startupService = new WindowsStartupService(_logger);
         _progressService = new SimulatedProgressService(_logger);
 
-        // Initialize Spotify Services (PKCE, Secure Token Store, Web API)
+        // Initialize Spotify Services (PKCE, Secure Token Store, Web API, Playback Service)
         var spotifyConfig = new SpotifyConfig();
         _tokenStore = new WindowsDpapiTokenStore(null, _logger);
         _spotifyAuthService = new SpotifyAuthService(spotifyConfig, _tokenStore, null, _logger);
         _spotifyApiService = new SpotifyApiService(_spotifyAuthService, spotifyConfig, null, _logger);
+        _spotifyService = new SpotifyService(_spotifyAuthService, spotifyConfig, null, _logger);
 
         // Load saved theme and apply immediately before opening UI
         var currentSettings = _settingsService.CurrentSettings;
@@ -93,7 +95,8 @@ public partial class App : System.Windows.Application
             _lifecycleManager,
             _progressService,
             _spotifyAuthService,
-            _spotifyApiService);
+            _spotifyApiService,
+            _spotifyService);
         
         // Window starts hidden as per blueprint specification
         _islandView.Visibility = Visibility.Hidden;
