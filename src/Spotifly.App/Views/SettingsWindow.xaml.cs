@@ -14,6 +14,16 @@ public partial class SettingsWindow : Window
         InitializeComponent();
     }
 
+    private async void ConnectSpotifyButton_Click(object sender, RoutedEventArgs e)
+    {
+        await _viewModel.ConnectSpotifyAsync();
+    }
+
+    private async void DisconnectSpotifyButton_Click(object sender, RoutedEventArgs e)
+    {
+        await _viewModel.DisconnectSpotifyAsync();
+    }
+
     private void ResetProgressButton_Click(object sender, RoutedEventArgs e)
     {
         _viewModel.ResetSimulatedProgress();

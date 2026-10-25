@@ -33,7 +33,7 @@ dotnet run --project src/Spotifly.App
 - [x] **Phase 3**: Hover Trigger, Compact Menu and Expanded/Collapsed States
 - [x] **Phase 4**: Theme System and Settings Window
 - [x] **Phase 5**: Curved Semicircular Progress Control (Simulated Data First)
-- [ ] **Phase 6**: Spotify Authentication and API Connectivity Test
+- [x] **Phase 6**: Spotify Authentication and API Connectivity Test
 - [ ] **Phase 7**: Spotify Service: Now Playing, Playback and Album Art
 - [ ] **Phase 8**: Spotify Playlist List with Cover Art
 - [ ] **Phase 9**: Playlist Song List with Album Art
@@ -43,7 +43,21 @@ dotnet run --project src/Spotifly.App
 - [ ] **Phase 13**: Testing, Accessibility, Performance and Security
 - [ ] **Phase 14**: Packaging and Final Handoff
 
-## Spotify Developer Policy Checkpoint (Phase 5)
+## Spotify Developer Dashboard Configuration (Phase 6)
+To enable real Spotify authentication with Spotifly:
+1. Open the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and select your application: `Spotifly Windows dynamic island`.
+2. Go to **Settings** (`Basic Information` / `Redirect URIs`).
+3. Add the exact loopback redirect URI:
+   ```text
+   http://127.0.0.1:43821/callback
+   ```
+   *(Note: Spotify requires explicit `127.0.0.1`; `localhost` is strictly disallowed by Spotify).*
+4. In **User Management** (while in Development Mode):
+   - Add your Spotify account email to the **Users Allowlist**.
+   - Development Mode allows up to 5 authorized users, and the app creator must have an active Spotify Premium account.
+5. Save the changes in the dashboard.
+6. In Spotifly Settings, click **Connect Spotify**. Your default browser will open to Spotify's authorization page. Click **Agree**; Spotify will redirect to the local loopback server, exchange the PKCE code for tokens, encrypt them via Windows DPAPI, and immediately verify the connection via `GET /v1/me`.
+
 > [!IMPORTANT]
 > **Mandatory Policy Checkpoint before Phase 7 / Live Playback Binding**:
 > 1. In accordance with the **Spotify Developer Policy** and Spotify Developer Terms of Service, developers must strictly adhere to commercial and content display guidelines.

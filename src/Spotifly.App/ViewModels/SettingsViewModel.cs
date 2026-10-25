@@ -14,6 +14,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     private readonly IAppLifecycleManager? _lifecycleManager;
     private readonly IOverlayPositionService? _positionService;
     private readonly ISimulatedProgressService? _progressService;
+    private readonly ISpotifyAuthService? _authService;
+    private readonly ISpotifyApiService? _apiService;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -23,7 +25,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         IStartupService startupService,
         IAppLifecycleManager? lifecycleManager = null,
         IOverlayPositionService? positionService = null,
-        ISimulatedProgressService? progressService = null)
+        ISimulatedProgressService? progressService = null,
+        ISpotifyAuthService? authService = null,
+        ISpotifyApiService? apiService = null)
     {
         _settingsService = settingsService;
         _themeService = themeService;
@@ -31,6 +35,30 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         _lifecycleManager = lifecycleManager;
         _positionService = positionService;
         _progressService = progressService;
+        _authService = authService;
+        _apiService = apiService;
+
+        if (_authService != null)
+        {
+            _authService.ConnectionStatusChanged += (s, isConnected) =>
+            {
+                OnPropertyChanged(nameof(IsSpotifyConnected));
+                OnPropertyChanged(nameof(SpotifyConnectionStatusText));
+                if (isConnected)
+                {
+                    _ = RefreshProfileAsync();
+                }
+                else
+                {
+                    SpotifyProfileText = "Not connected";
+                }
+            };
+
+            if (_authService.IsConnected)
+            {
+                _ = RefreshProfileAsync();
+            }
+        }
 
         if (_progressService != null)
         {
@@ -247,6 +275,132 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     public void SimulateNextTrack()
     {
         _progressService?.NextTrack();
+    }
+
+    // ==========================================
+    // Spotify Connection Properties & Actions (Phase 6)
+    // ==========================================
+
+    public bool IsSpotifyConnected => _authService?.IsConnected ?? false;
+
+    public string SpotifyConnectionStatusText => IsSpotifyConnected ? "Connected" : "Disconnected";
+
+    private string _spotifyProfileText = "Not connected";
+    public string SpotifyProfileText
+    {
+        get => _spotifyProfileText;
+        private set
+        {
+            if (_spotifyProfileText != value)
+            {
+                _spotifyProfileText = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    private string? _spotifyStatusMessage;
+    public string? SpotifyStatusMessage
+    {
+        get => _spotifyStatusMessage;
+        private set
+        {
+            if (_spotifyStatusMessage != value)
+            {
+                _spotifyStatusMessage = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    private bool _isAuthenticating;
+    public bool IsAuthenticating
+    {
+        get => _isAuthenticating;
+        private set
+        {
+            if (_isAuthenticating != value)
+            {
+                _isAuthenticating = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public async Task ConnectSpotifyAsync()
+    {
+        if (_authService == null) return;
+
+        IsAuthenticating = true;
+        SpotifyStatusMessage = "Waiting for authorization in browser...";
+
+        try
+        {
+            bool ok = await _authService.AuthenticateAsync();
+            if (ok)
+            {
+                SpotifyStatusMessage = "Connected successfully! Testing API connectivity...";
+                await RefreshProfileAsync();
+            }
+            else
+            {
+                SpotifyStatusMessage = "Authorization was denied, cancelled, or failed.";
+            }
+        }
+        catch (TimeoutException)
+        {
+            SpotifyStatusMessage = "Authentication timed out (2 minutes). Please try again.";
+        }
+        catch (Exception ex)
+        {
+            SpotifyStatusMessage = $"Connection error: {ex.Message}";
+        }
+        finally
+        {
+            IsAuthenticating = false;
+        }
+    }
+
+    public async Task DisconnectSpotifyAsync()
+    {
+        if (_authService == null) return;
+
+        SpotifyStatusMessage = "Disconnecting...";
+        try
+        {
+            await _authService.DisconnectAsync();
+            SpotifyStatusMessage = "Disconnected from Spotify.";
+            SpotifyProfileText = "Not connected";
+        }
+        catch (Exception ex)
+        {
+            SpotifyStatusMessage = $"Error disconnecting: {ex.Message}";
+        }
+    }
+
+    public async Task RefreshProfileAsync()
+    {
+        if (_apiService == null || !IsSpotifyConnected) return;
+
+        try
+        {
+            var profile = await _apiService.GetCurrentUserProfileAsync();
+            if (profile != null)
+            {
+                string plan = string.IsNullOrEmpty(profile.Product) ? "User" : profile.Product.ToUpperInvariant();
+                string name = profile.DisplayName ?? profile.Id;
+                SpotifyProfileText = $"{name} ({plan})";
+                SpotifyStatusMessage = "Spotify connection active and verified via GET /v1/me.";
+            }
+            else
+            {
+                SpotifyStatusMessage = "Connected, but could not load user profile.";
+            }
+        }
+        catch (Exception ex)
+        {
+            SpotifyStatusMessage = $"API verification error: {ex.Message}";
+        }
     }
 
     public void ResetToDefaults()

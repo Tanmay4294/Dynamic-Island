@@ -25,6 +25,8 @@ public partial class IslandView : Window
     private readonly IStartupService? _startupService;
     private readonly IAppLifecycleManager? _lifecycleManager;
     private readonly ISimulatedProgressService? _progressService;
+    private readonly ISpotifyAuthService? _authService;
+    private readonly ISpotifyApiService? _apiService;
     private bool _isDisposed;
 
     // State machine
@@ -86,7 +88,9 @@ public partial class IslandView : Window
         IThemeService? themeService = null,
         IStartupService? startupService = null,
         IAppLifecycleManager? lifecycleManager = null,
-        ISimulatedProgressService? progressService = null)
+        ISimulatedProgressService? progressService = null,
+        ISpotifyAuthService? authService = null,
+        ISpotifyApiService? apiService = null)
     {
         _positionService = positionService;
         _logger = logger;
@@ -95,6 +99,8 @@ public partial class IslandView : Window
         _startupService = startupService;
         _lifecycleManager = lifecycleManager;
         _progressService = progressService;
+        _authService = authService;
+        _apiService = apiService;
 
         InitializeComponent();
 
@@ -590,7 +596,15 @@ public partial class IslandView : Window
             if (_activeSettingsWindow == null || !_activeSettingsWindow.IsLoaded)
             {
                 var vm = (_settingsService != null && _themeService != null && _startupService != null)
-                    ? new ViewModels.SettingsViewModel(_settingsService, _themeService, _startupService, _lifecycleManager, _positionService, _progressService)
+                    ? new ViewModels.SettingsViewModel(
+                        _settingsService,
+                        _themeService,
+                        _startupService,
+                        _lifecycleManager,
+                        _positionService,
+                        _progressService,
+                        _authService,
+                        _apiService)
                     : null;
 
                 if (vm != null)
