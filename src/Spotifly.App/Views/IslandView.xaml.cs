@@ -452,14 +452,13 @@ public partial class IslandView : Window
                 var containerOrigin = IslandContainer.TranslatePoint(new System.Windows.Point(0, 0), this);
                 var ptInContainer = new System.Windows.Point(ptInWindow.X - containerOrigin.X, ptInWindow.Y - containerOrigin.Y);
 
-                // Keep the expanded island open while the pointer is anywhere inside
-                // its visible semicircle.  A rectangular bounds check makes the
-                // cursor appear to leave/re-enter as it crosses the curved edge,
-                // which starts the hide timer and produces the repeated collapse.
-                // The same vector geometry is used by WM_NCHITTEST, so polling and
-                // native hit-testing agree on the exact progress-arc boundary.
-                bool isOverIsland = _currentIslandGeometry != null &&
-                    _currentIslandGeometry.FillContains(ptInContainer);
+                // Keep the expanded island open over the whole rendered dome. Use
+                // the live animated dimensions here rather than a cached geometry:
+                // during a resize the cached path can briefly be one frame ahead of
+                // the container, which made a small horizontal mouse move start
+                // the hide timer. A small edge tolerance prevents polling jitter
+                // from toggling the state at the progress arc.
+                bool isOverIsland = IsPointInsideHoverRegion(ptInContainer);
 
                 if (isOverIsland)
                 {
@@ -486,6 +485,41 @@ public partial class IslandView : Window
                 // Fallback
             }
         }
+    }
+
+    private bool IsPointInsideHoverRegion(System.Windows.Point point)
+    {
+        if (_currentIslandGeometry == null)
+        {
+            return false;
+        }
+
+        bool expanded = _currentState is IslandState.Expanded or IslandState.Library or
+            IslandState.PlaylistTracks or IslandState.SettingsOpen;
+        if (!expanded)
+        {
+            return _currentIslandGeometry.FillContains(point);
+        }
+
+        double width = IslandContainer.ActualWidth;
+        double height = IslandContainer.ActualHeight;
+        if (width <= 0 || height <= 0 || point.X < 0 || point.X > width || point.Y < 0)
+        {
+            return false;
+        }
+
+        const double edgeTolerance = 8.0;
+        double drop = height * 0.10;
+        double radiusX = width / 2.0;
+        double radiusY = height - drop;
+        double normalizedX = (point.X - radiusX) / radiusX;
+        if (Math.Abs(normalizedX) > 1.0)
+        {
+            return false;
+        }
+
+        double curveY = drop + radiusY * Math.Sqrt(Math.Max(0, 1 - normalizedX * normalizedX));
+        return point.Y <= curveY + edgeTolerance;
     }
 
     private void OnActivationTimerTick(object? sender, EventArgs e)
