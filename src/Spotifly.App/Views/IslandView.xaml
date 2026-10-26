@@ -248,7 +248,7 @@
                                 <Border Grid.Column="0"
                                         Grid.Row="0"
                                         Grid.ColumnSpan="2"
-                                        Width="76" Height="76"
+                                        Width="79" Height="79"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Top"
                                         Margin="0,-38,0,0"
@@ -276,7 +276,7 @@
                                 </Border>
 
                                 <!-- Track details, Spotify badge, and Media Playback Controls -->
-                                <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,-42,0,2" VerticalAlignment="Top" HorizontalAlignment="Stretch">
+                                <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,-28,0,2" VerticalAlignment="Top" HorizontalAlignment="Stretch">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
@@ -287,7 +287,7 @@
                                     <Grid Grid.Row="0">
                                         <TextBlock x:Name="TrackTitleText"
                                                    Text="No Track Playing"
-                                                   FontSize="14"
+                                                   FontSize="15"
                                                    FontWeight="Bold"
                                                    Foreground="{DynamicResource IslandForegroundBrush}"
                                                    TextAlignment="Center"
@@ -315,7 +315,7 @@
                                     <TextBlock x:Name="TrackArtistText"
                                                Grid.Row="1"
                                                Text="Spotify is idle"
-                                               FontSize="12"
+                                               FontSize="13"
                                                Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
                                                TextAlignment="Center"
                                                HorizontalAlignment="Center"
