@@ -11,8 +11,8 @@ public class Phase2OverlayTests
     {
         var dimensions = new OverlayDimensions();
 
-        Assert.Equal(250.0, dimensions.CompactWidth);
-        Assert.Equal(55.0, dimensions.CompactHeight);
+        Assert.Equal(210.0, dimensions.CompactWidth);
+        Assert.Equal(45.0, dimensions.CompactHeight);
         Assert.Equal(26.0, dimensions.CornerRadius);
         Assert.Equal(0.0, dimensions.HorizontalOffset);
         Assert.Equal(0.0, dimensions.VerticalOffset);

@@ -57,15 +57,15 @@
                       Height="46"
                       Margin="16,3,16,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="38" />
+                        <ColumnDefinition Width="32" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="38" />
+                        <ColumnDefinition Width="32" />
                     </Grid.ColumnDefinitions>
 
                     <!-- 1. Settings (Gear vector icon) -->
                     <Button x:Name="SettingsButton"
                             Grid.Column="0"
-                            Width="32" Height="32"
+                            Width="28" Height="28"
                             ToolTip="Spotifly Settings"
                             AutomationProperties.Name="Spotifly Settings"
                             Style="{DynamicResource IslandCircleButtonStyle}"
@@ -93,18 +93,13 @@
                                   Margin="0,0,6,0"
                                   Stretch="Uniform"
                                   Data="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M16.59,16.43C16.41,16.72 16.03,16.81 15.74,16.63C13.39,15.2 10.43,14.88 6.95,15.67C6.62,15.75 6.29,15.54 6.21,15.21C6.13,14.88 6.34,14.55 6.67,14.47C10.48,13.6 13.75,13.96 16.39,15.58C16.68,15.76 16.77,16.14 16.59,16.43M17.81,13.71C17.58,14.08 17.1,14.2 16.73,13.97C14.04,12.32 9.94,11.84 6.76,12.81C6.35,12.93 5.91,12.7 5.79,12.29C5.67,11.88 5.9,11.44 6.31,11.32C9.94,10.22 14.47,10.75 17.55,12.65C17.92,12.88 18.04,13.36 17.81,13.71M17.92,10.88C14.69,8.95 9.38,8.78 6.3,9.71C5.81,9.86 5.29,9.58 5.14,9.09C4.99,8.6 5.27,8.08 5.76,7.93C9.3,6.86 15.17,7.07 18.88,9.28C19.32,9.54 19.46,10.11 19.2,10.55C18.94,11 18.36,11.14 17.92,10.88Z" />
-                            <TextBlock Text="Spotifly"
-                                       Foreground="{DynamicResource IslandForegroundBrush}"
-                                       FontWeight="SemiBold"
-                                       FontSize="12"
-                                       VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
 
                     <!-- 3. Close / Dismiss (X vector icon) -->
                     <Button x:Name="DismissButton"
                             Grid.Column="2"
-                            Width="32" Height="32"
+                            Width="28" Height="28"
                             ToolTip="Dismiss Island (Esc)"
                             AutomationProperties.Name="Dismiss Island"
                             Style="{DynamicResource IslandCircleButtonStyle}"
@@ -124,7 +119,7 @@
                       Opacity="0"
                       HorizontalAlignment="Stretch"
                       VerticalAlignment="Stretch"
-                      Margin="36,12,36,24">
+                      Margin="36,0,36,12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
