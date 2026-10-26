@@ -1,4 +1,6 @@
 using System.Runtime.InteropServices;
+using System.IO;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -35,6 +37,8 @@ public partial class IslandView : Window
     private double _lastPlaylistVerticalOffset;
     private bool _isPlaybackRequestInProgress;
     private string? _currentArtworkUrl;
+    private int _artworkLoadVersion;
+    private static readonly HttpClient ArtworkHttpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
     private bool _isDisposed;
     private long _transitionVersion;
 
@@ -928,27 +932,40 @@ public partial class IslandView : Window
             if (_currentArtworkUrl != track.ArtworkUrl)
             {
                 _currentArtworkUrl = track.ArtworkUrl;
-                try
-                {
-                    var bitmap = new System.Windows.Media.Imaging.BitmapImage();
-                    bitmap.BeginInit();
-                    bitmap.UriSource = new Uri(track.ArtworkUrl, UriKind.Absolute);
-                    bitmap.DecodePixelWidth = 124; // Performance: decode at 2x native display size (62 DIP * 2)
-                    bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-                    bitmap.EndInit();
-                    bitmap.Freeze(); // Performance: freeze bitmap to allow cross-thread access and fast GPU blitting
-                    AlbumArtworkImage.Source = bitmap;
-                }
-                catch
-                {
-                    AlbumArtworkImage.Source = null;
-                }
+                AlbumArtworkImage.Source = null;
+                _ = LoadArtworkAsync(track.ArtworkUrl, ++_artworkLoadVersion);
             }
         }
         else
         {
             _currentArtworkUrl = null;
+            _artworkLoadVersion++;
             AlbumArtworkImage.Source = null;
+        }
+    }
+
+    private async Task LoadArtworkAsync(string artworkUrl, int loadVersion)
+    {
+        try
+        {
+            var bytes = await ArtworkHttpClient.GetByteArrayAsync(artworkUrl);
+            using var stream = new MemoryStream(bytes);
+            var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+            bitmap.DecodePixelWidth = 160;
+            bitmap.StreamSource = stream;
+            bitmap.EndInit();
+            bitmap.Freeze();
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (loadVersion == _artworkLoadVersion && _currentArtworkUrl == artworkUrl)
+                    AlbumArtworkImage.Source = bitmap;
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning("Spotify album artwork could not be loaded; showing placeholder.", ex);
         }
     }
 

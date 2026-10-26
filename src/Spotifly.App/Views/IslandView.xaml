@@ -206,13 +206,15 @@
                     <Grid Grid.Row="1">
                         <!-- 1. Now Playing Body Panel -->
                         <Border x:Name="NowPlayingPanel"
-                                Background="#18FFFFFF"
-                                BorderBrush="#22FFFFFF"
-                                BorderThickness="1"
-                                CornerRadius="16"
-                                Padding="12"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Padding="0"
                                 VerticalAlignment="Stretch">
                             <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="72" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <!-- Album Artwork Column -->
                                     <ColumnDefinition Width="68" />
@@ -222,9 +224,11 @@
 
                                 <!-- Artwork with rounded corners and missing-artwork fallback -->
                                 <Border Grid.Column="0"
+                                        Grid.Row="0"
+                                        Grid.ColumnSpan="2"
                                         Width="62" Height="62"
-                                        HorizontalAlignment="Left"
-                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Top"
                                         CornerRadius="10"
                                         ClipToBounds="True"
                                         Background="#262626"
@@ -249,7 +253,7 @@
                                 </Border>
 
                                 <!-- Track details, Spotify badge, and Media Playback Controls -->
-                                <Grid Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                                <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,2" VerticalAlignment="Top" HorizontalAlignment="Stretch">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
@@ -263,6 +267,7 @@
                                                    FontSize="13"
                                                    FontWeight="Bold"
                                                    Foreground="{DynamicResource IslandForegroundBrush}"
+                                                   TextAlignment="Center"
                                                    TextTrimming="CharacterEllipsis"
                                                    ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                                    Margin="0,0,22,0" />
@@ -270,6 +275,7 @@
                                         <!-- Spotify Brand Attribution Icon (Open track in Spotify) -->
                                         <Button x:Name="OpenInSpotifyButton"
                                                 Width="18" Height="18"
+                                                Visibility="Collapsed"
                                                 HorizontalAlignment="Right"
                                                 VerticalAlignment="Center"
                                                 ToolTip="Open track in Spotify"
@@ -288,12 +294,14 @@
                                                Text="Spotify is idle"
                                                FontSize="11"
                                                Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
+                                               TextAlignment="Center"
+                                               HorizontalAlignment="Center"
                                                TextTrimming="CharacterEllipsis"
                                                ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                                Margin="0,2,0,6" />
 
                                     <!-- Row 2: Media Playback Transport Controls -->
-                                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left">
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
                                         <!-- Previous Track Button -->
                                         <Button x:Name="PreviousTrackButton"
                                                 Width="28" Height="28"
