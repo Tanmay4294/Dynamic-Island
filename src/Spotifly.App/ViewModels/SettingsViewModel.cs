@@ -330,6 +330,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
 
         IsAuthenticating = true;
         SpotifyStatusMessage = "Waiting for authorization in browser...";
+        System.Diagnostics.Debug.WriteLine("Connect Spotify requested; starting PKCE authorization.");
 
         try
         {

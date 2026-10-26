@@ -117,11 +117,20 @@ public sealed class SpotifyAuthService : ISpotifyAuthService, IDisposable
             string authUrl = $"{_config.AuthorizeEndpoint}?{query}";
 
             _logger?.LogInformation("Opening system browser for Spotify authorization.");
-            Process.Start(new ProcessStartInfo
+            try
             {
-                FileName = authUrl,
-                UseShellExecute = true
-            });
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = authUrl,
+                    UseShellExecute = true
+                });
+                _logger?.LogInformation($"Spotify authorization browser launch requested; redirect URI is {_config.RedirectUri}.");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError("Could not launch the system browser for Spotify authorization.", ex);
+                throw new InvalidOperationException("Could not open your browser for Spotify authorization. Open a browser and try Connect Spotify again.", ex);
+            }
 
             // Wait for callback with timeout
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

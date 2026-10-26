@@ -16,6 +16,7 @@ public partial class SettingsWindow : Window
 
     private async void ConnectSpotifyButton_Click(object sender, RoutedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine("Connect Spotify button clicked.");
         await _viewModel.ConnectSpotifyAsync();
     }
 

@@ -95,7 +95,6 @@
                                     Height="30" Width="130"
                                     HorizontalAlignment="Left"
                                     Cursor="Hand"
-                                    IsEnabled="{Binding IsAuthenticating}"
                                     Background="{DynamicResource IslandAccentBrush}"
                                     Foreground="#000000"
                                     FontWeight="SemiBold"
