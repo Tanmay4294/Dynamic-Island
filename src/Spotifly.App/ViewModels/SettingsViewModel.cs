@@ -348,9 +348,13 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         {
             SpotifyStatusMessage = "Authentication timed out (2 minutes). Please try again.";
         }
-        catch (Exception ex)
+        catch (InvalidOperationException ex) when (ex.Message.Contains("local listener", StringComparison.OrdinalIgnoreCase))
         {
-            SpotifyStatusMessage = $"Connection error: {ex.Message}";
+            SpotifyStatusMessage = ex.Message;
+        }
+        catch (Exception)
+        {
+            SpotifyStatusMessage = "Could not complete Spotify authorization. Check your network and redirect URI, then try again.";
         }
         finally
         {
@@ -402,9 +406,9 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            SpotifyStatusMessage = $"API verification error: {ex.Message}";
+            SpotifyStatusMessage = "Could not verify the Spotify account. Check your network access and Developer Dashboard user allowlist.";
         }
     }
 
