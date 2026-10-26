@@ -58,7 +58,7 @@ public class SpotifyPlaylistTracksTests
         {
             pageCount++;
             Assert.Equal(HttpMethod.Get, req.Method);
-            Assert.Contains("/playlists/test_pl_1/tracks", req.RequestUri?.ToString());
+            Assert.Contains("/playlists/test_pl_1/items", req.RequestUri?.ToString());
 
             if (req.RequestUri?.ToString().Contains("offset=0") == true)
             {
@@ -67,7 +67,7 @@ public class SpotifyPlaylistTracksTests
                     Limit = 2,
                     Offset = 0,
                     Total = 3,
-                    Next = "https://api.spotify.com/v1/playlists/test_pl_1/tracks?limit=2&offset=2",
+                    Next = "https://api.spotify.com/v1/playlists/test_pl_1/items?limit=2&offset=2",
                     Items = new List<SpotifyPlaylistTrackItem>
                     {
                         new()

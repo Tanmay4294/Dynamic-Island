@@ -362,11 +362,9 @@
                         <!-- 2. Playlists Library Panel (Phase 8) -->
                         <Border x:Name="PlaylistsLibraryPanel"
                                 Visibility="Collapsed"
-                                Background="#18FFFFFF"
-                                BorderBrush="#22FFFFFF"
-                                BorderThickness="1"
-                                CornerRadius="16"
-                                Padding="8,6"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Padding="0,4"
                                 VerticalAlignment="Stretch">
                             <Grid>
                                 <Grid.RowDefinitions>

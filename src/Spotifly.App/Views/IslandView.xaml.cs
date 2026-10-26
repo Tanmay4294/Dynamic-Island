@@ -649,9 +649,7 @@ public partial class IslandView : Window
             {
                 ExpandedTitleText.Text = "Playlists";
                 ExpandedTitleText.Visibility = Visibility.Visible;
-                NavigationHintBadge.Visibility = Visibility.Visible;
-                NavigationHintText.Text = "Scroll for Now Playing";
-                NavigationHintIcon.Data = Geometry.Parse("M7.41,8.59L12,13.17L16.59,8.59L18,10L12,16L6,10L7.41,8.59Z"); // Down chevron
+                NavigationHintBadge.Visibility = Visibility.Collapsed;
                 NowPlayingPanel.Visibility = Visibility.Collapsed;
                 PlaylistTracksPanel.Visibility = Visibility.Collapsed;
                 PlaylistsLibraryPanel.Visibility = Visibility.Visible;

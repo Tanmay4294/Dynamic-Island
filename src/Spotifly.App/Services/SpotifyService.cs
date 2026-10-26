@@ -735,7 +735,9 @@ public sealed class SpotifyService : ISpotifyService, IDisposable
             var allTracks = new List<TrackInfo>();
             int limit = 100;
             int offset = 0;
-            string? nextUrl = $"{_config.ApiBaseUrl}/playlists/{playlistId}/tracks?limit={limit}&offset={offset}&additional_types=track,episode";
+            // Spotify's current playlist endpoint is /items; /tracks now returns 403
+            // for otherwise valid playlist permissions.
+            string? nextUrl = $"{_config.ApiBaseUrl}/playlists/{playlistId}/items?limit={limit}&offset={offset}&additional_types=track,episode";
 
             while (!string.IsNullOrEmpty(nextUrl))
             {
