@@ -9,7 +9,7 @@ public sealed class OverlayDimensions
     /// <summary>
     /// Default compact width in device-independent pixels (DIP).
     /// </summary>
-    public double CompactWidth { get; set; } = 90.0;
+    public double CompactWidth { get; set; } = 75.0;
 
     /// <summary>
     /// Default compact height in device-independent pixels (DIP).
