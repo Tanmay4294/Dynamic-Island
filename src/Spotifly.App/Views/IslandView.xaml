@@ -135,6 +135,7 @@
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
                             <TextBlock x:Name="ExpandedTitleText"
                                        Text="Now Playing"
+                                       Visibility="Collapsed"
                                        FontSize="11"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
@@ -142,6 +143,7 @@
 
                             <!-- View Indicator / Wheel Hint (Phase 11) -->
                             <Border x:Name="NavigationHintBadge"
+                                    Visibility="Collapsed"
                                     Margin="8,0,0,0"
                                     Padding="5,1"
                                     CornerRadius="4"

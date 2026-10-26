@@ -638,6 +638,7 @@ public partial class IslandView : Window
             if (to == IslandState.Library)
             {
                 ExpandedTitleText.Text = "Playlists";
+                ExpandedTitleText.Visibility = Visibility.Visible;
                 NavigationHintBadge.Visibility = Visibility.Visible;
                 NavigationHintText.Text = "Scroll for Now Playing";
                 NavigationHintIcon.Data = Geometry.Parse("M7.41,8.59L12,13.17L16.59,8.59L18,10L12,16L6,10L7.41,8.59Z"); // Down chevron
@@ -648,6 +649,7 @@ public partial class IslandView : Window
             }
             else if (to == IslandState.PlaylistTracks)
             {
+                ExpandedTitleText.Visibility = Visibility.Visible;
                 ExpandedTitleText.Text = "Songs";
                 NavigationHintBadge.Visibility = Visibility.Collapsed; // Wheel mode switching disabled inside tracks
                 NowPlayingPanel.Visibility = Visibility.Collapsed;
@@ -660,10 +662,8 @@ public partial class IslandView : Window
             }
             else
             {
-                ExpandedTitleText.Text = "Now Playing";
-                NavigationHintBadge.Visibility = Visibility.Visible;
-                NavigationHintText.Text = "Scroll for Playlists";
-                NavigationHintIcon.Data = Geometry.Parse("M7.41,15.41L12,10.83L16.59,15.41L18,14L12,8L6,14L7.41,15.41Z"); // Up chevron
+                ExpandedTitleText.Visibility = Visibility.Collapsed;
+                NavigationHintBadge.Visibility = Visibility.Collapsed;
                 PlaylistsLibraryPanel.Visibility = Visibility.Collapsed;
                 PlaylistTracksPanel.Visibility = Visibility.Collapsed;
                 NowPlayingPanel.Visibility = Visibility.Visible;

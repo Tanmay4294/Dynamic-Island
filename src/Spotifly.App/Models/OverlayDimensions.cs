@@ -24,7 +24,7 @@ public sealed class OverlayDimensions
     /// <summary>
     /// Default expanded height in DIP.
     /// </summary>
-    public double ExpandedHeight { get; set; } = 150.0;
+    public double ExpandedHeight { get; set; } = 200.0;
 
     /// <summary>
     /// Corner radius for compact state.

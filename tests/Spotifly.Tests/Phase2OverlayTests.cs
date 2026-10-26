@@ -18,7 +18,7 @@ public class Phase2OverlayTests
         Assert.Equal(0.0, dimensions.VerticalOffset);
         Assert.Equal(10.0, dimensions.WindowMargin);
         Assert.Equal(380.0, dimensions.WindowWidth);
-        Assert.Equal(170.0, dimensions.WindowHeight);
+        Assert.Equal(220.0, dimensions.WindowHeight);
     }
 
     [Theory]

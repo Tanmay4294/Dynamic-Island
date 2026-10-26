@@ -17,7 +17,7 @@ public class Phase3StateModelTests
         Assert.Equal(250.0, dims.CompactWidth);
         Assert.Equal(55.0, dims.CompactHeight);
         Assert.Equal(360.0, dims.ExpandedWidth);
-        Assert.Equal(150.0, dims.ExpandedHeight);
+        Assert.Equal(200.0, dims.ExpandedHeight);
         Assert.Equal(260.0, dims.ActivationZoneWidth);
         Assert.Equal(6.0, dims.ActivationZoneHeight);
         Assert.Equal(200, dims.ActivationDelayMs);
