@@ -510,6 +510,15 @@ public partial class IslandView : Window
             return false;
         }
 
+        // The flat top of the expanded dome contains the corner action buttons.
+        // Keep this header band hit-testable even while the animated arc is being
+        // recomputed; otherwise the settings-side button can raise MouseLeave for
+        // one polling frame and start the collapse timer.
+        if (point.Y <= 64.0)
+        {
+            return true;
+        }
+
         const double edgeTolerance = 8.0;
         double drop = height * 0.10;
         double radiusX = width / 2.0;
