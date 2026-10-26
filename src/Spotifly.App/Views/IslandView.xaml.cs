@@ -514,7 +514,11 @@ public partial class IslandView : Window
         // Keep this header band hit-testable even while the animated arc is being
         // recomputed; otherwise the settings-side button can raise MouseLeave for
         // one polling frame and start the collapse timer.
-        if (point.Y <= 64.0)
+        // Include a small corner zone around the Settings and Close buttons. The
+        // buttons sit above the arc and can briefly straddle the clipped path
+        // while the expanded animation is settling, especially on the left side.
+        if (point.Y <= 64.0 ||
+            ((point.X <= 110.0 || point.X >= width - 110.0) && point.Y <= 120.0))
         {
             return true;
         }
