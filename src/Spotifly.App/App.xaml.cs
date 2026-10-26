@@ -116,6 +116,11 @@ public partial class App : System.Windows.Application
             {
                 _logger.LogInformation("Island visibility toggle triggered from tray.");
                 _islandView?.ToggleVisibility();
+            },
+            onSettingsRequested: () =>
+            {
+                _logger.LogInformation("Settings open triggered from tray.");
+                _islandView?.OpenSettings();
             });
         _lifecycleManager.RegisterDisposable(_trayIconService);
 

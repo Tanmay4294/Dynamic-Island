@@ -42,7 +42,7 @@
                                    Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
                                    Margin="0,0,0,8">
                             <Run Text="Redirect URI (must match your Spotify app settings): " />
-                            <Run Text="{Binding SpotifyRedirectUri}" FontWeight="SemiBold" />
+                            <Run Text="{Binding SpotifyRedirectUri, Mode=OneWay}" FontWeight="SemiBold" />
                         </TextBlock>
 
                 <Border Background="{DynamicResource IslandCardBackgroundBrush}"

@@ -11,12 +11,14 @@ public sealed class TrayIconService : IDisposable
     private readonly NotifyIcon _notifyIcon;
     private readonly Action _onExitRequested;
     private readonly Action? _onToggleIslandRequested;
+    private readonly Action? _onSettingsRequested;
     private bool _disposed;
 
-    public TrayIconService(Action onExitRequested, Action? onToggleIslandRequested = null)
+    public TrayIconService(Action onExitRequested, Action? onToggleIslandRequested = null, Action? onSettingsRequested = null)
     {
         _onExitRequested = onExitRequested;
         _onToggleIslandRequested = onToggleIslandRequested;
+        _onSettingsRequested = onSettingsRequested;
 
         var contextMenu = new ContextMenuStrip();
         
@@ -24,6 +26,10 @@ public sealed class TrayIconService : IDisposable
         openItem.Font = new System.Drawing.Font(openItem.Font, System.Drawing.FontStyle.Bold);
         openItem.Click += (s, e) => _onToggleIslandRequested?.Invoke();
         contextMenu.Items.Add(openItem);
+
+        var settingsItem = new ToolStripMenuItem("Open Settings");
+        settingsItem.Click += (s, e) => _onSettingsRequested?.Invoke();
+        contextMenu.Items.Add(settingsItem);
 
         var devToggle = new ToolStripMenuItem("Developer: Toggle Island Visibility");
         devToggle.Click += (s, e) => _onToggleIslandRequested?.Invoke();

@@ -747,8 +747,13 @@ public partial class IslandView : Window
 
     private void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
-        _logger?.LogInformation("Settings gear clicked; opening Settings window.");
+        OpenSettings();
         e.Handled = true;
+    }
+
+    public void OpenSettings()
+    {
+        _logger?.LogInformation("Settings gear clicked; opening Settings window.");
         _isInteracting = true;
         _hideTimer.Stop();
 
