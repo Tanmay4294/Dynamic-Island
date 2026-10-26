@@ -341,6 +341,20 @@ public partial class IslandView : Window
         if (IslandProgressArc != null)
         {
             IslandProgressArc.IsCompact = isCompact;
+            IslandProgressArc.Visibility = isCompact ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        if (isCompact)
+        {
+            // Keep the compact Spotify pill clean, without the expanded progress
+            // contour or green outline forming an oval around the logo.
+            IslandBackgroundPath.Stroke = System.Windows.Media.Brushes.Transparent;
+            IslandContainer.Effect = null;
+        }
+        else
+        {
+            IslandBackgroundPath.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "IslandBorderBrush");
+            IslandContainer.SetResourceReference(UIElement.EffectProperty, "IslandShadowEffect");
         }
     }
 
@@ -378,8 +392,7 @@ public partial class IslandView : Window
             return;
         }
 
-        var cursorInDip = PhysicalScreenPointToDip(pt.X, pt.Y);
-        ProcessCursorPosition(cursorInDip.X, cursorInDip.Y);
+        ProcessCursorPositionCore(pt.X, pt.Y, coordinatesArePhysicalPixels: true);
     }
 
     private System.Windows.Point PhysicalScreenPointToDip(double x, double y)
@@ -400,8 +413,18 @@ public partial class IslandView : Window
     /// </summary>
     internal void ProcessCursorPosition(double cursorX, double cursorY)
     {
+        // Tests and callers pass logical screen coordinates. The Win32 poller uses
+        // ProcessCursorPositionCore directly with physical screen pixels.
+        ProcessCursorPositionCore(cursorX, cursorY, coordinatesArePhysicalPixels: false);
+    }
+
+    private void ProcessCursorPositionCore(double cursorX, double cursorY, bool coordinatesArePhysicalPixels)
+    {
         var workArea = SystemParameters.WorkArea;
         var dims = _positionService.Dimensions;
+        var cursorInDip = coordinatesArePhysicalPixels
+            ? PhysicalScreenPointToDip(cursorX, cursorY)
+            : new System.Windows.Point(cursorX, cursorY);
 
         // Check if cursor is in the top-centre activation trigger zone
         double centerScreenX = workArea.Left + (workArea.Width / 2.0) + dims.HorizontalOffset;
@@ -410,7 +433,8 @@ public partial class IslandView : Window
         double zoneTop = workArea.Top + dims.VerticalOffset;
         double zoneBottom = zoneTop + dims.ActivationZoneHeight;
 
-        bool inZone = (cursorX >= zoneLeft && cursorX <= zoneRight && cursorY >= zoneTop && cursorY <= zoneBottom);
+        bool inZone = (cursorInDip.X >= zoneLeft && cursorInDip.X <= zoneRight &&
+                       cursorInDip.Y >= zoneTop && cursorInDip.Y <= zoneBottom);
 
         if (inZone)
         {
@@ -450,7 +474,10 @@ public partial class IslandView : Window
         {
             try
             {
-                var ptInWindow = PointFromScreen(new System.Windows.Point(cursorX, cursorY));
+                var screenPoint = coordinatesArePhysicalPixels
+                    ? new System.Windows.Point(cursorX, cursorY)
+                    : LogicalScreenPointToPhysical(cursorX, cursorY);
+                var ptInWindow = PointFromScreen(screenPoint);
                 var containerOrigin = IslandContainer.TranslatePoint(new System.Windows.Point(0, 0), this);
                 var ptInContainer = new System.Windows.Point(ptInWindow.X - containerOrigin.X, ptInWindow.Y - containerOrigin.Y);
 
@@ -487,6 +514,19 @@ public partial class IslandView : Window
                 // Fallback
             }
         }
+    }
+
+    private System.Windows.Point LogicalScreenPointToPhysical(double x, double y)
+    {
+        var point = new System.Windows.Point(x, y);
+        var source = PresentationSource.FromVisual(this);
+        if (source?.CompositionTarget is { } target)
+        {
+            return target.TransformToDevice.Transform(point);
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(this);
+        return new System.Windows.Point(x * dpi.DpiScaleX, y * dpi.DpiScaleY);
     }
 
     private bool IsPointInsideHoverRegion(System.Windows.Point point)
@@ -607,8 +647,7 @@ public partial class IslandView : Window
         // hide timer is warranted instead of trusting this routed event alone.
         if (GetCursorPos(out var screenPoint))
         {
-            var cursorInDip = PhysicalScreenPointToDip(screenPoint.X, screenPoint.Y);
-            ProcessCursorPosition(cursorInDip.X, cursorInDip.Y);
+            ProcessCursorPositionCore(screenPoint.X, screenPoint.Y, coordinatesArePhysicalPixels: true);
             return;
         }
 
