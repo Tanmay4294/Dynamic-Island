@@ -452,7 +452,10 @@ public partial class IslandView : Window
                 var containerOrigin = IslandContainer.TranslatePoint(new System.Windows.Point(0, 0), this);
                 var ptInContainer = new System.Windows.Point(ptInWindow.X - containerOrigin.X, ptInWindow.Y - containerOrigin.Y);
 
-                bool isOverIsland = _currentIslandGeometry != null && _currentIslandGeometry.FillContains(ptInContainer);
+                bool isOverIsland = _currentState is IslandState.Expanded or IslandState.Library or IslandState.PlaylistTracks or IslandState.SettingsOpen
+                    ? ptInContainer.X >= 0 && ptInContainer.X <= IslandContainer.ActualWidth &&
+                      ptInContainer.Y >= 0 && ptInContainer.Y <= IslandContainer.ActualHeight
+                    : _currentIslandGeometry != null && _currentIslandGeometry.FillContains(ptInContainer);
 
                 if (isOverIsland)
                 {

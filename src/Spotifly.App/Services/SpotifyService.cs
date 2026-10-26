@@ -809,9 +809,10 @@ public sealed class SpotifyService : ISpotifyService, IDisposable
             foreach (var item in page.Items)
             {
                 // Null entries, local files, or unsupported items handled gracefully
-                if (item?.Track == null) continue;
+                var playableItem = item?.Item ?? item?.Track;
+                if (playableItem == null) continue;
 
-                var trackInfo = MapItemToTrackInfo(item.Track, item.Track.Uri?.StartsWith("spotify:episode") == true ? "episode" : "track");
+                var trackInfo = MapItemToTrackInfo(playableItem, playableItem.Uri?.StartsWith("spotify:episode") == true ? "episode" : "track");
                 accumulator.Add(trackInfo);
             }
         }

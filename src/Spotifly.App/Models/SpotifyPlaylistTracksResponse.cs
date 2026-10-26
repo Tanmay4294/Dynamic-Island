@@ -36,4 +36,7 @@ public sealed class SpotifyPlaylistTrackItem
 
     [JsonPropertyName("track")]
     public SpotifyItem? Track { get; set; }
+
+    [JsonPropertyName("item")]
+    public SpotifyItem? Item { get; set; }
 }
