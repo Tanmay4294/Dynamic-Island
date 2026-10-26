@@ -54,18 +54,18 @@
                 <Grid x:Name="CompactView"
                       HorizontalAlignment="Stretch"
                       VerticalAlignment="Top"
-                      Height="46"
-                      Margin="16,3,16,0">
+                      Height="38"
+                      Margin="8,0,8,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="32" />
+                        <ColumnDefinition Width="28" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="32" />
+                        <ColumnDefinition Width="28" />
                     </Grid.ColumnDefinitions>
 
                     <!-- 1. Settings (Gear vector icon) -->
                     <Button x:Name="SettingsButton"
                             Grid.Column="0"
-                            Width="28" Height="28"
+                            Width="24" Height="24"
                             ToolTip="Spotifly Settings"
                             AutomationProperties.Name="Spotifly Settings"
                             Style="{DynamicResource IslandCircleButtonStyle}"
@@ -99,7 +99,7 @@
                     <!-- 3. Close / Dismiss (X vector icon) -->
                     <Button x:Name="DismissButton"
                             Grid.Column="2"
-                            Width="28" Height="28"
+                            Width="24" Height="24"
                             ToolTip="Dismiss Island (Esc)"
                             AutomationProperties.Name="Dismiss Island"
                             Style="{DynamicResource IslandCircleButtonStyle}"
@@ -226,6 +226,7 @@
                                         Width="62" Height="62"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Top"
+                                        Margin="0,-16,0,0"
                                         CornerRadius="10"
                                         ClipToBounds="True"
                                         Background="#262626"
@@ -250,7 +251,7 @@
                                 </Border>
 
                                 <!-- Track details, Spotify badge, and Media Playback Controls -->
-                                <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,0,2" VerticalAlignment="Top" HorizontalAlignment="Stretch">
+                                <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,-8,0,2" VerticalAlignment="Top" HorizontalAlignment="Stretch">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
@@ -321,8 +322,8 @@
                                                 Background="{DynamicResource IslandAccentBrush}"
                                                 Style="{DynamicResource IslandCircleButtonStyle}"
                                                 Click="PlayPauseButton_Click">
-                                            <Path x:Name="PlayPauseIconPath"
-                                                  Fill="#000000"
+                                                  <Path x:Name="PlayPauseIconPath"
+                                                  Fill="#FFFFFFFF"
                                                   Width="13" Height="13"
                                                   Stretch="Uniform"
                                                   Data="M8,5.14V19.14L19,12.14L8,5.14Z" />
@@ -343,6 +344,7 @@
 
                                         <!-- Status / Device indicator -->
                                         <TextBlock x:Name="PlaybackDeviceText"
+                                                   Visibility="Collapsed"
                                                    FontSize="10"
                                                    Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
                                                    VerticalAlignment="Center"

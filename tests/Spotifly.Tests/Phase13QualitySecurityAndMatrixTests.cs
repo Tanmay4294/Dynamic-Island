@@ -141,13 +141,13 @@ public class Phase13QualitySecurityAndMatrixTests
         double expectedLeft = (screenWidth - dims.CompactWidth) / 2.0 + dims.HorizontalOffset;
         double expectedTop = dims.VerticalOffset;
 
-        Assert.Equal(855.0, expectedLeft); // (1920 - 210) / 2
+        Assert.Equal(870.0, expectedLeft); // (1920 - 180) / 2
         Assert.Equal(0.0, expectedTop);
 
         // Scaled resolution simulation (e.g. 150% scaling = 1280x720 DIPs)
         double scaledWidth = 1280;
         double expectedScaledLeft = (scaledWidth - dims.CompactWidth) / 2.0;
-        Assert.Equal(535.0, expectedScaledLeft);
+        Assert.Equal(550.0, expectedScaledLeft);
     }
 
     private class MockHttpMessageHandler : HttpMessageHandler
