@@ -4,6 +4,7 @@
         Title="Spotifly Settings"
         Height="620" Width="440"
         WindowStartupLocation="CenterScreen"
+        ShowActivated="True"
         ResizeMode="NoResize"
         Background="{DynamicResource WindowBackgroundBrush}"
         Foreground="{DynamicResource IslandForegroundBrush}"
