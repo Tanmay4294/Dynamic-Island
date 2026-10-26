@@ -206,9 +206,9 @@ public partial class IslandView : Window
         // Listen for screen resolution and display changes
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
 
-        // Hook MouseEnter / MouseLeave on IslandContainer for robust direct hover detection
-        IslandContainer.MouseEnter += OnIslandMouseEnter;
-        IslandContainer.MouseLeave += OnIslandMouseLeave;
+        // Hover state is driven exclusively by the screen cursor poller. Direct
+        // WPF MouseEnter/MouseLeave events are not reliable for this transparent,
+        // clipped window during animated resizes and caused left-side flicker.
 
         // Start hidden by default
         Visibility = Visibility.Hidden;
