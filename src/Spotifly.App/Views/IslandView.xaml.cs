@@ -341,7 +341,7 @@ public partial class IslandView : Window
         if (IslandProgressArc != null)
         {
             IslandProgressArc.IsCompact = isCompact;
-            IslandProgressArc.Visibility = isCompact ? Visibility.Collapsed : Visibility.Visible;
+            IslandProgressArc.Visibility = Visibility.Visible;
         }
 
         if (isCompact)
