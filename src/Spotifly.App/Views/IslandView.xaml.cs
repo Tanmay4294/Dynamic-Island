@@ -452,10 +452,14 @@ public partial class IslandView : Window
                 var containerOrigin = IslandContainer.TranslatePoint(new System.Windows.Point(0, 0), this);
                 var ptInContainer = new System.Windows.Point(ptInWindow.X - containerOrigin.X, ptInWindow.Y - containerOrigin.Y);
 
-                bool isOverIsland = _currentState is IslandState.Expanded or IslandState.Library or IslandState.PlaylistTracks or IslandState.SettingsOpen
-                    ? ptInContainer.X >= 0 && ptInContainer.X <= IslandContainer.ActualWidth &&
-                      ptInContainer.Y >= 0 && ptInContainer.Y <= IslandContainer.ActualHeight
-                    : _currentIslandGeometry != null && _currentIslandGeometry.FillContains(ptInContainer);
+                // Keep the expanded island open while the pointer is anywhere inside
+                // its visible semicircle.  A rectangular bounds check makes the
+                // cursor appear to leave/re-enter as it crosses the curved edge,
+                // which starts the hide timer and produces the repeated collapse.
+                // The same vector geometry is used by WM_NCHITTEST, so polling and
+                // native hit-testing agree on the exact progress-arc boundary.
+                bool isOverIsland = _currentIslandGeometry != null &&
+                    _currentIslandGeometry.FillContains(ptInContainer);
 
                 if (isOverIsland)
                 {
