@@ -13,7 +13,7 @@ public sealed class AppSettings
 
     public int ActivationDelayMs { get; set; } = 200;
 
-    public int HideDelayMs { get; set; } = 250;
+    public int HideDelayMs { get; set; } = 100;
 
     public double HorizontalOffset { get; set; } = 0.0;
 
@@ -35,7 +35,7 @@ public sealed class AppSettings
         ActivationDelayMs = Math.Clamp(ActivationDelayMs, 50, 1500);
 
         // Clamp hide delay between 200ms and 3000ms
-        HideDelayMs = Math.Clamp(HideDelayMs, 200, 3000);
+        HideDelayMs = Math.Clamp(HideDelayMs, 50, 3000);
 
         // Clamp screen offsets between -500 and +500 DIP
         HorizontalOffset = Math.Clamp(HorizontalOffset, -500.0, 500.0);
