@@ -271,7 +271,7 @@
                                                    TextAlignment="Center"
                                                    TextTrimming="CharacterEllipsis"
                                                    ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
-                                                   Margin="0,0,22,0" />
+                                                   Margin="0" />
 
                                         <!-- Spotify Brand Attribution Icon (Open track in Spotify) -->
                                         <Button x:Name="OpenInSpotifyButton"

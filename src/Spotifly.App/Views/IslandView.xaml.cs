@@ -32,12 +32,17 @@ public partial class IslandView : Window
     private readonly ISpotifyService? _spotifyService;
     private readonly IWheelNavigationService _wheelNavService;
     private readonly DispatcherTimer _playbackPollTimer;
+    private readonly DispatcherTimer _progressAnimationTimer;
     private readonly DispatcherTimer _toastTimer;
     private PlaylistInfo? _selectedPlaylist;
     private double _lastPlaylistVerticalOffset;
     private bool _isPlaybackRequestInProgress;
     private string? _currentArtworkUrl;
     private int _artworkLoadVersion;
+    private long? _liveProgressMs;
+    private long? _liveDurationMs;
+    private bool _liveIsPlaying;
+    private DateTime _liveProgressSnapshotUtc;
     private static readonly HttpClient ArtworkHttpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
     private bool _isDisposed;
     private long _transitionVersion;
@@ -154,6 +159,9 @@ public partial class IslandView : Window
             Interval = TimeSpan.FromSeconds(15)
         };
         _playbackPollTimer.Tick += OnPlaybackPollTick;
+        _progressAnimationTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+        _progressAnimationTimer.Tick += OnProgressAnimationTick;
+        _progressAnimationTimer.Start();
         if (_authService != null)
         {
             _authService.ConnectionStatusChanged += OnSpotifyConnectionStatusChanged;
@@ -589,6 +597,7 @@ public partial class IslandView : Window
         if (to == IslandState.Hidden)
         {
             _playbackPollTimer.Stop();
+            _progressAnimationTimer.Stop();
             var fadeOut = new DoubleAnimation(IslandContainer.Opacity, 0.0, duration) { EasingFunction = easing };
             fadeOut.Completed += (s, e) => CompleteHiddenTransition(transitionVersion);
             IslandContainer.BeginAnimation(UIElement.OpacityProperty, fadeOut);
@@ -600,6 +609,7 @@ public partial class IslandView : Window
             Reposition();
             Visibility = Visibility.Visible;
             _playbackPollTimer.Start();
+            _progressAnimationTimer.Start();
             _ = _spotifyService?.RefreshPlaybackAsync();
             double currentOpacity = IslandContainer.Opacity;
             // If already fully hidden or starting transition from Hidden, start from 0
@@ -863,6 +873,11 @@ public partial class IslandView : Window
     {
         var track = snapshot.Track;
 
+        _liveProgressMs = snapshot.ProgressMs;
+        _liveDurationMs = snapshot.DurationMs;
+        _liveIsPlaying = snapshot.IsPlaying;
+        _liveProgressSnapshotUtc = snapshot.SnapshotTimeUtc;
+
         // Spotify's playback endpoint provides progress_ms and the track duration.
         // Keep the visual arc driven by live playback whenever that service exists;
         // simulated progress is only used in the settings/demo-only configuration.
@@ -942,6 +957,16 @@ public partial class IslandView : Window
             _artworkLoadVersion++;
             AlbumArtworkImage.Source = null;
         }
+    }
+
+    private void OnProgressAnimationTick(object? sender, EventArgs e)
+    {
+        if (_spotifyService == null || !_liveIsPlaying)
+            return;
+
+        var progress = _liveProgressMs.GetValueOrDefault() +
+                       (long)Math.Max(0, (DateTime.UtcNow - _liveProgressSnapshotUtc).TotalMilliseconds);
+        IslandProgressArc.Progress = PlaybackProgressCalculator.Normalize(progress, _liveDurationMs);
     }
 
     private async Task LoadArtworkAsync(string artworkUrl, int loadVersion)
@@ -1365,6 +1390,7 @@ public partial class IslandView : Window
             _activationTimer.Stop();
             _hideTimer.Stop();
             _playbackPollTimer.Stop();
+            _progressAnimationTimer.Stop();
             SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             if (_authService != null)
             {
