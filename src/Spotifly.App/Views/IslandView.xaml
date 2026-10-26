@@ -129,8 +129,26 @@
                     </Grid.RowDefinitions>
 
                     <!-- Header bar in expanded view: view label & navigation indicator & actions -->
-                    <Grid Grid.Row="0" Margin="0,0,0,10">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <Grid Grid.Row="0" Height="40" Margin="0,6,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                            <!-- Reference layout: settings action at the upper-left corner. -->
+                            <Button Width="32" Height="32"
+                                    Background="#26374146"
+                                    ToolTip="Settings"
+                                    AutomationProperties.Name="Open Settings"
+                                    Style="{DynamicResource IslandCircleButtonStyle}"
+                                    Click="SettingsButton_Click">
+                                <Path Fill="{DynamicResource IslandSecondaryForegroundBrush}"
+                                      Width="16" Height="16"
+                                      Stretch="Uniform"
+                                      Data="M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94c0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.44,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.73,8.87c-0.12,0.21 -0.08,0.47 0.12,0.61l2.03,1.58C4.83,11.36 4.8,11.69 4.8,12s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.25,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61L19.14,12.94z M12,15.5c-1.93,0 -3.5,-1.57 -3.5,-3.5s1.57,-3.5 3.5,-3.5s3.5,1.57 3.5,3.5S13.93,15.5 12,15.5z" />
+                            </Button>
                             <TextBlock x:Name="ExpandedTitleText"
                                        Text="Now Playing"
                                        Visibility="Collapsed"
@@ -163,10 +181,11 @@
                             </Border>
                         </StackPanel>
 
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                             <!-- Toggle Library / Now Playing Button -->
                             <Button x:Name="LibraryToggleButton"
                                     Width="24" Height="24"
+                                    Visibility="Collapsed"
                                     ToolTip="Your Playlists"
                                     AutomationProperties.Name="Toggle Playlists and Now Playing"
                                     Style="{DynamicResource IslandCircleButtonStyle}"
@@ -176,8 +195,10 @@
                                       Stretch="Uniform"
                                       Data="M4,6H2V20A2,2 0 0,0 4,22H18V20H4M20,2H8A2,2 0 0,0 6,4V16A2,2 0 0,0 8,18H20A2,2 0 0,0 22,16V4A2,2 0 0,0 20,2M20,16H8V4H20M10,9V11H18V9M10,6V8H18V6M10,12V14H15V12" />
                             </Button>
-                            <Button Width="24" Height="24"
-                                    Margin="4,0,0,0"
+                            <Button Width="32" Height="32"
+                                    Margin="0"
+                                    Visibility="Collapsed"
+                                    Background="#26374146"
                                     ToolTip="Settings"
                                     AutomationProperties.Name="Open Settings"
                                     Style="{DynamicResource IslandCircleButtonStyle}"
@@ -187,8 +208,9 @@
                                       Stretch="Uniform"
                                       Data="M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94c0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.44,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.73,8.87c-0.12,0.21 -0.08,0.47 0.12,0.61l2.03,1.58C4.83,11.36 4.8,11.69 4.8,12s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.25,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61L19.14,12.94z M12,15.5c-1.93,0 -3.5,-1.57 -3.5,-3.5s1.57,-3.5 3.5,-3.5s3.5,1.57 3.5,3.5S13.93,15.5 12,15.5z" />
                             </Button>
-                            <Button Width="24" Height="24"
-                                    Margin="4,0,0,0"
+                            <Button Width="32" Height="32"
+                                    Margin="0,0,4,0"
+                                    Background="#26374146"
                                     ToolTip="Dismiss Island"
                                     AutomationProperties.Name="Dismiss Expanded Island"
                                     Style="{DynamicResource IslandCircleButtonStyle}"
@@ -306,20 +328,21 @@
                                         <!-- Previous Track Button -->
                                         <Button x:Name="PreviousTrackButton"
                                                 Width="28" Height="28"
+                                                Background="#26374146"
                                                 ToolTip="Previous Track"
                                                 AutomationProperties.Name="Previous Track"
                                                 Style="{DynamicResource IslandCircleButtonStyle}"
                                                 Click="PreviousTrackButton_Click">
                                             <Path Fill="{DynamicResource IslandForegroundBrush}"
-                                                  Width="11" Height="11"
+                                                Width="18" Height="18"
                                                   Stretch="Uniform"
                                                   Data="M6,6H8V18H6M9.5,12L18,18V6L9.5,12Z" />
                                         </Button>
 
                                         <!-- Play / Pause Button -->
                                         <Button x:Name="PlayPauseButton"
-                                                Width="32" Height="32"
-                                                Margin="8,0,8,0"
+                                                Width="52" Height="52"
+                                                Margin="14,0,14,0"
                                                 ToolTip="Play / Pause"
                                                 AutomationProperties.Name="Play or Pause"
                                                 Background="{DynamicResource IslandAccentBrush}"
@@ -327,7 +350,7 @@
                                                 Click="PlayPauseButton_Click">
                                                   <Path x:Name="PlayPauseIconPath"
                                                   Fill="#FFFFFFFF"
-                                                  Width="13" Height="13"
+                                                  Width="20" Height="20"
                                                   Stretch="Uniform"
                                                   Data="M8,5.14V19.14L19,12.14L8,5.14Z" />
                                         </Button>
@@ -335,12 +358,13 @@
                                         <!-- Next Track Button -->
                                         <Button x:Name="NextTrackButton"
                                                 Width="28" Height="28"
+                                                Background="#26374146"
                                                 ToolTip="Next Track"
                                                 AutomationProperties.Name="Next Track"
                                                 Style="{DynamicResource IslandCircleButtonStyle}"
                                                 Click="NextTrackButton_Click">
                                             <Path Fill="{DynamicResource IslandForegroundBrush}"
-                                                  Width="11" Height="11"
+                                                Width="18" Height="18"
                                                   Stretch="Uniform"
                                                   Data="M16,18H18V6H16M6,6L14.5,12L6,18V6Z" />
                                         </Button>

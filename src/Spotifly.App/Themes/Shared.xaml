@@ -30,8 +30,8 @@
                 <ControlTemplate TargetType="Button">
                     <Grid Background="Transparent">
                         <Border x:Name="HoverBackground"
-                                CornerRadius="18"
-                                Background="Transparent"
+                                CornerRadius="100"
+                                Background="{TemplateBinding Background}"
                                 HorizontalAlignment="Stretch"
                                 VerticalAlignment="Stretch" />
                         <ContentPresenter HorizontalAlignment="Center"
