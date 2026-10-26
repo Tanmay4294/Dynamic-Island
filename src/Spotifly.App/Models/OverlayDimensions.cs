@@ -73,7 +73,7 @@ public sealed class OverlayDimensions
     /// <summary>
     /// Delay before hiding the island when pointer leaves the island boundary (milliseconds).
     /// </summary>
-    public int HideDelayMs { get; set; } = 700;
+    public int HideDelayMs { get; set; } = 250;
 
     /// <summary>
     /// Animation transition duration in milliseconds.

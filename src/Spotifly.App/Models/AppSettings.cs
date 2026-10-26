@@ -13,7 +13,7 @@ public sealed class AppSettings
 
     public int ActivationDelayMs { get; set; } = 200;
 
-    public int HideDelayMs { get; set; } = 700;
+    public int HideDelayMs { get; set; } = 250;
 
     public double HorizontalOffset { get; set; } = 0.0;
 

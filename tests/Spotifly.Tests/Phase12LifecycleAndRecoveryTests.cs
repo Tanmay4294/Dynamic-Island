@@ -58,7 +58,7 @@ public class Phase12LifecycleAndRecoveryTests
             // Recovers to default settings
             Assert.Equal(AppTheme.Minimal, loaded.Theme);
             Assert.Equal(200, loaded.ActivationDelayMs);
-            Assert.Equal(700, loaded.HideDelayMs);
+            Assert.Equal(250, loaded.HideDelayMs);
             Assert.False(loaded.LaunchAtSignIn);
 
             // Re-saves valid defaults

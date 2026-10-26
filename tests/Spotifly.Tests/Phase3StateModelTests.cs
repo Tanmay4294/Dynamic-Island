@@ -21,7 +21,7 @@ public class Phase3StateModelTests
         Assert.Equal(260.0, dims.ActivationZoneWidth);
         Assert.Equal(6.0, dims.ActivationZoneHeight);
         Assert.Equal(200, dims.ActivationDelayMs);
-        Assert.Equal(700, dims.HideDelayMs);
+        Assert.Equal(250, dims.HideDelayMs);
         Assert.Equal(200, dims.AnimationDurationMs);
     }
 
