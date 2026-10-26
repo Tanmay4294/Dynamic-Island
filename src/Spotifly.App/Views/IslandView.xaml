@@ -341,8 +341,8 @@
 
                                         <!-- Play / Pause Button -->
                                         <Button x:Name="PlayPauseButton"
-                                                Width="52" Height="52"
-                                                Margin="14,0,14,0"
+                                                Width="32" Height="32"
+                                                Margin="8,0,8,0"
                                                 ToolTip="Play / Pause"
                                                 AutomationProperties.Name="Play or Pause"
                                                 Background="{DynamicResource IslandAccentBrush}"
