@@ -1,3 +1,5 @@
+using System.Windows;
+using System.Runtime.ExceptionServices;
 using Spotifly.App.Models;
 using Spotifly.App.Services;
 using Spotifly.App.Views;
@@ -5,13 +7,13 @@ using Xunit;
 
 namespace Spotifly.Tests;
 
+[Collection("WPF UI")]
 public class Phase3StateModelTests
 {
     [Fact]
     public void OverlayDimensions_IncludesPhase3TimingsAndExpandedBounds()
     {
         var dims = new OverlayDimensions();
-
         Assert.Equal(250.0, dims.CompactWidth);
         Assert.Equal(55.0, dims.CompactHeight);
         Assert.Equal(360.0, dims.ExpandedWidth);
@@ -32,46 +34,150 @@ public class Phase3StateModelTests
     [InlineData(IslandState.PlaylistTracks)]
     public void IslandState_DefinesAllRequiredPhase3States(IslandState state)
     {
-        // Verifies the enum covers all six required architectural states
         Assert.True(Enum.IsDefined(typeof(IslandState), state));
     }
 
     [Fact]
     public void IslandView_TransitionsThroughStatesOnStaThread()
     {
-        var thread = new Thread(() =>
+        RunOnSta(() =>
         {
             var positionService = new OverlayPositionService();
             var window = new IslandView(positionService);
-
             Assert.Equal(IslandState.Hidden, window.CurrentState);
-
             IslandState? capturedState = null;
             window.IslandStateChanged += (s, newState) => capturedState = newState;
-
-            // 1. Transition to Compact
             window.TransitionToState(IslandState.Compact);
             Assert.Equal(IslandState.Compact, window.CurrentState);
             Assert.Equal(IslandState.Compact, capturedState);
-
-            // 2. Transition to Expanded
             window.TransitionToState(IslandState.Expanded);
             Assert.Equal(IslandState.Expanded, window.CurrentState);
             Assert.Equal(IslandState.Expanded, capturedState);
-
-            // 3. Transition to SettingsOpen
             window.TransitionToState(IslandState.SettingsOpen);
             Assert.Equal(IslandState.SettingsOpen, window.CurrentState);
-
-            // 4. Transition back to Hidden
             window.TransitionToState(IslandState.Hidden);
             Assert.Equal(IslandState.Hidden, window.CurrentState);
-
             window.Close();
         });
+    }
 
+    [Fact]
+    public void IslandView_TenCursorLeaveAndReentryCycles_CollapseAndReactivate()
+    {
+        RunOnSta(() =>
+        {
+            var dims = new OverlayDimensions
+            {
+                ActivationDelayMs = 50,
+                HideDelayMs = 50,
+                AnimationDurationMs = 50
+            };
+            var positionService = new OverlayPositionService(dims);
+            var window = new IslandView(positionService);
+            var workArea = SystemParameters.WorkArea;
+            double centerScreenX = workArea.Left + (workArea.Width / 2.0) + dims.HorizontalOffset;
+            double zoneY = workArea.Top + dims.VerticalOffset + (dims.ActivationZoneHeight / 2.0);
+            double outsideX = centerScreenX;
+            double outsideY = workArea.Top + dims.VerticalOffset + dims.ExpandedHeight + 100.0;
+            for (int cycle = 0; cycle < 10; cycle++)
+            {
+                window.TransitionToState(IslandState.Hidden);
+                Assert.Equal(IslandState.Hidden, window.CurrentState);
+                window.ProcessCursorPosition(centerScreenX, zoneY);
+                window.ActivateFromCursorZone();
+                Assert.Equal(IslandState.Compact, window.CurrentState);
+                window.TransitionToState(IslandState.Expanded);
+                Assert.Equal(IslandState.Expanded, window.CurrentState);
+                window.ProcessCursorPosition(outsideX, outsideY);
+                window.CollapseAfterCursorLeave();
+                Assert.Equal(IslandState.Compact, window.CurrentState);
+                window.ProcessCursorPosition(centerScreenX, zoneY);
+                window.ActivateFromCursorZone();
+                Assert.Equal(IslandState.Compact, window.CurrentState);
+                window.TransitionToState(IslandState.Expanded);
+                Assert.Equal(IslandState.Expanded, window.CurrentState);
+            }
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void IslandView_CursorEntryDuringCollapseAnimation_ReactivatesSmoothly()
+    {
+        RunOnSta(() =>
+        {
+            var dims = new OverlayDimensions
+            {
+                ActivationDelayMs = 50,
+                HideDelayMs = 50,
+                AnimationDurationMs = 150
+            };
+            var positionService = new OverlayPositionService(dims);
+            var window = new IslandView(positionService);
+            var workArea = SystemParameters.WorkArea;
+            double centerScreenX = workArea.Left + (workArea.Width / 2.0) + dims.HorizontalOffset;
+            double zoneY = workArea.Top + dims.VerticalOffset + (dims.ActivationZoneHeight / 2.0);
+            double outsideY = workArea.Top + dims.VerticalOffset + dims.ExpandedHeight + 100.0;
+            window.TransitionToState(IslandState.Compact);
+            Assert.Equal(IslandState.Compact, window.CurrentState);
+            window.ProcessCursorPosition(centerScreenX, outsideY);
+            window.CollapseAfterCursorLeave();
+            Assert.Equal(IslandState.Compact, window.CurrentState);
+            // A pending animation cannot prevent a new activation request.
+            window.ProcessCursorPosition(centerScreenX, zoneY);
+            window.ActivateFromCursorZone();
+            Assert.Equal(IslandState.Compact, window.CurrentState);
+            window.DismissIsland();
+            Assert.Equal(IslandState.Hidden, window.CurrentState);
+            window.ProcessCursorPosition(centerScreenX, zoneY);
+            window.ActivateFromCursorZone();
+            Assert.Equal(IslandState.Compact, window.CurrentState);
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void IslandView_DismissButtonAndTrayToggle_CannotLeaveIslandPermanentlyHidden()
+    {
+        RunOnSta(() =>
+        {
+            var dims = new OverlayDimensions();
+            var positionService = new OverlayPositionService(dims);
+            var window = new IslandView(positionService);
+            var workArea = SystemParameters.WorkArea;
+            double centerScreenX = workArea.Left + (workArea.Width / 2.0) + dims.HorizontalOffset;
+            double zoneY = workArea.Top + dims.VerticalOffset + (dims.ActivationZoneHeight / 2.0);
+            window.ToggleVisibility();
+            Assert.Equal(IslandState.Compact, window.CurrentState);
+            window.ToggleVisibility();
+            Assert.Equal(IslandState.Hidden, window.CurrentState);
+            window.ProcessCursorPosition(centerScreenX, zoneY);
+            window.ActivateFromCursorZone();
+            Assert.Equal(IslandState.Compact, window.CurrentState);
+            window.Close();
+        });
+    }
+
+    private static void RunOnSta(Action action)
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
-        thread.Join(5000);
+        Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "STA test thread timed out.");
+        if (failure != null)
+        {
+            ExceptionDispatchInfo.Capture(failure).Throw();
+        }
     }
 }

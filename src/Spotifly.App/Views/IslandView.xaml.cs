@@ -36,6 +36,7 @@ public partial class IslandView : Window
     private bool _isPlaybackRequestInProgress;
     private string? _currentArtworkUrl;
     private bool _isDisposed;
+    private long _transitionVersion;
 
     // State machine
     private IslandState _currentState = IslandState.Hidden;
@@ -360,6 +361,28 @@ public partial class IslandView : Window
             return;
         }
 
+        var cursorInDip = PhysicalScreenPointToDip(pt.X, pt.Y);
+        ProcessCursorPosition(cursorInDip.X, cursorInDip.Y);
+    }
+
+    private System.Windows.Point PhysicalScreenPointToDip(double x, double y)
+    {
+        var source = PresentationSource.FromVisual(this);
+        if (source?.CompositionTarget is { } target)
+        {
+            return target.TransformFromDevice.Transform(new System.Windows.Point(x, y));
+        }
+
+        var dpi = VisualTreeHelper.GetDpi(this);
+        return new System.Windows.Point(x / dpi.DpiScaleX, y / dpi.DpiScaleY);
+    }
+
+    /// <summary>
+    /// Processes cursor coordinates against activation zone and island boundaries.
+    /// Internal to facilitate automated unit testing of hover activation and hide lifecycles.
+    /// </summary>
+    internal void ProcessCursorPosition(double cursorX, double cursorY)
+    {
         var workArea = SystemParameters.WorkArea;
         var dims = _positionService.Dimensions;
 
@@ -370,7 +393,7 @@ public partial class IslandView : Window
         double zoneTop = workArea.Top + dims.VerticalOffset;
         double zoneBottom = zoneTop + dims.ActivationZoneHeight;
 
-        bool inZone = (pt.X >= zoneLeft && pt.X <= zoneRight && pt.Y >= zoneTop && pt.Y <= zoneBottom);
+        bool inZone = (cursorX >= zoneLeft && cursorX <= zoneRight && cursorY >= zoneTop && cursorY <= zoneBottom);
 
         if (inZone)
         {
@@ -380,6 +403,17 @@ public partial class IslandView : Window
                 _hideTimer.Stop();
 
                 if (_currentState == IslandState.Hidden)
+                {
+                    _activationTimer.Start();
+                }
+            }
+            else
+            {
+                // Cursor remains inside activation zone; ensure hide timer stays stopped
+                _hideTimer.Stop();
+
+                // If currently hidden or animating out and activation timer is not running, start it
+                if (_currentState == IslandState.Hidden && !_activationTimer.IsEnabled)
                 {
                     _activationTimer.Start();
                 }
@@ -399,7 +433,7 @@ public partial class IslandView : Window
         {
             try
             {
-                var ptInWindow = PointFromScreen(new System.Windows.Point(pt.X, pt.Y));
+                var ptInWindow = PointFromScreen(new System.Windows.Point(cursorX, cursorY));
                 var containerOrigin = IslandContainer.TranslatePoint(new System.Windows.Point(0, 0), this);
                 var ptInContainer = new System.Windows.Point(ptInWindow.X - containerOrigin.X, ptInWindow.Y - containerOrigin.Y);
 
@@ -435,6 +469,11 @@ public partial class IslandView : Window
     private void OnActivationTimerTick(object? sender, EventArgs e)
     {
         _activationTimer.Stop();
+        ActivateFromCursorZone();
+    }
+
+    internal void ActivateFromCursorZone()
+    {
         if (_isCursorInsideActivationZone || _isCursorInsideIsland)
         {
             _logger?.LogInformation("Activation timer elapsed: transitioning to Compact.");
@@ -445,15 +484,19 @@ public partial class IslandView : Window
     private void OnHideTimerTick(object? sender, EventArgs e)
     {
         _hideTimer.Stop();
+        CollapseAfterCursorLeave();
+    }
 
+    internal void CollapseAfterCursorLeave()
+    {
         // Do not hide while interacting, while pointer is inside, or while settings window is open
         if (_isCursorInsideIsland || _isCursorInsideActivationZone || _isInteracting || (_activeSettingsWindow != null && _activeSettingsWindow.IsLoaded))
         {
             return;
         }
 
-        _logger?.LogInformation("Hide timer elapsed: transitioning to Hidden.");
-        TransitionToState(IslandState.Hidden);
+        _logger?.LogInformation("Hide timer elapsed: collapsing to Compact.");
+        TransitionToState(IslandState.Compact);
     }
 
     private void StartHideDelayIfNeeded()
@@ -501,12 +544,36 @@ public partial class IslandView : Window
         _logger?.LogInformation($"Island state transition: {_currentState} -> {newState}");
         var previousState = _currentState;
         _currentState = newState;
+        _hideTimer.Stop();
+        _activationTimer.Stop();
+        var transitionVersion = ++_transitionVersion;
+        StopTransitionAnimations();
 
-        AnimateStateTransition(previousState, newState);
+        AnimateStateTransition(previousState, newState, transitionVersion);
         IslandStateChanged?.Invoke(this, newState);
     }
 
-    private void AnimateStateTransition(IslandState from, IslandState to)
+    private void StopTransitionAnimations()
+    {
+        var opacity = IslandContainer.Opacity;
+        var width = IslandContainer.Width;
+        var height = IslandContainer.Height;
+        IslandContainer.BeginAnimation(UIElement.OpacityProperty, null);
+        IslandContainer.BeginAnimation(FrameworkElement.WidthProperty, null);
+        IslandContainer.BeginAnimation(FrameworkElement.HeightProperty, null);
+        IslandContainer.Opacity = opacity;
+        IslandContainer.Width = width;
+        IslandContainer.Height = height;
+
+        foreach (var element in new UIElement[] { CompactView, ExpandedView })
+        {
+            var currentOpacity = element.Opacity;
+            element.BeginAnimation(UIElement.OpacityProperty, null);
+            element.Opacity = currentOpacity;
+        }
+    }
+
+    private void AnimateStateTransition(IslandState from, IslandState to, long transitionVersion)
     {
         var dims = _positionService.Dimensions;
         var duration = TimeSpan.FromMilliseconds(dims.AnimationDurationMs);
@@ -515,10 +582,10 @@ public partial class IslandView : Window
         if (to == IslandState.Hidden)
         {
             _playbackPollTimer.Stop();
-            var fadeOut = new DoubleAnimation(1.0, 0.0, duration) { EasingFunction = easing };
+            var fadeOut = new DoubleAnimation(IslandContainer.Opacity, 0.0, duration) { EasingFunction = easing };
             fadeOut.Completed += (s, e) =>
             {
-                if (_currentState == IslandState.Hidden)
+                if (_currentState == IslandState.Hidden && _transitionVersion == transitionVersion)
                 {
                     Visibility = Visibility.Hidden;
                     IslandContainer.Opacity = 1.0;
@@ -528,21 +595,27 @@ public partial class IslandView : Window
             return;
         }
 
-        if (Visibility != Visibility.Visible)
+        if (Visibility != Visibility.Visible || IslandContainer.Opacity < 1.0)
         {
             Reposition();
             Visibility = Visibility.Visible;
             _playbackPollTimer.Start();
             _ = _spotifyService?.RefreshPlaybackAsync();
-            IslandContainer.Opacity = 0.0;
-            var fadeIn = new DoubleAnimation(0.0, 1.0, duration) { EasingFunction = easing };
+            double currentOpacity = IslandContainer.Opacity;
+            // If already fully hidden or starting transition from Hidden, start from 0
+            if (from == IslandState.Hidden && currentOpacity >= 1.0)
+            {
+                currentOpacity = 0.0;
+            }
+            IslandContainer.Opacity = currentOpacity;
+            var fadeIn = new DoubleAnimation(currentOpacity, 1.0, duration) { EasingFunction = easing };
             IslandContainer.BeginAnimation(UIElement.OpacityProperty, fadeIn);
         }
 
         if (to == IslandState.Compact)
         {
             // Animate width & height back to compact and update semicircular geometry
-            AnimateIslandDimensions(dims.CompactWidth, dims.CompactHeight, isCompact: true, duration, easing);
+            AnimateIslandDimensions(dims.CompactWidth, dims.CompactHeight, isCompact: true, duration, easing, transitionVersion);
 
             // Cross-fade views: Compact visible, Expanded collapsed
             CompactView.Visibility = Visibility.Visible;
@@ -552,7 +625,7 @@ public partial class IslandView : Window
             var expandedFade = new DoubleAnimation(ExpandedView.Opacity, 0.0, duration) { EasingFunction = easing };
             expandedFade.Completed += (s, e) =>
             {
-                if (_currentState == IslandState.Compact)
+                if (_currentState == IslandState.Compact && _transitionVersion == transitionVersion)
                 {
                     ExpandedView.Visibility = Visibility.Collapsed;
                 }
@@ -597,7 +670,7 @@ public partial class IslandView : Window
             }
 
             // Animate width & height to expanded and update expanded stadium geometry
-            AnimateIslandDimensions(dims.ExpandedWidth, dims.ExpandedHeight, isCompact: false, duration, easing);
+            AnimateIslandDimensions(dims.ExpandedWidth, dims.ExpandedHeight, isCompact: false, duration, easing, transitionVersion);
 
             // Cross-fade views: Expanded visible, Compact hidden
             ExpandedView.Visibility = Visibility.Visible;
@@ -607,7 +680,7 @@ public partial class IslandView : Window
             var compactFade = new DoubleAnimation(CompactView.Opacity, 0.0, duration) { EasingFunction = easing };
             compactFade.Completed += (s, e) =>
             {
-                if (_currentState != IslandState.Compact)
+                if (_currentState != IslandState.Compact && _transitionVersion == transitionVersion)
                 {
                     CompactView.Visibility = Visibility.Collapsed;
                 }
@@ -616,7 +689,7 @@ public partial class IslandView : Window
         }
     }
 
-    private void AnimateIslandDimensions(double targetWidth, double targetHeight, bool isCompact, TimeSpan duration, IEasingFunction easing)
+    private void AnimateIslandDimensions(double targetWidth, double targetHeight, bool isCompact, TimeSpan duration, IEasingFunction easing, long transitionVersion)
     {
         double startWidth = IslandContainer.ActualWidth > 0 ? IslandContainer.ActualWidth : targetWidth;
         double startHeight = IslandContainer.ActualHeight > 0 ? IslandContainer.ActualHeight : targetHeight;
@@ -634,7 +707,10 @@ public partial class IslandView : Window
         // Update the geometry at the end of the transition
         heightAnim.Completed += (s, e) =>
         {
-            UpdateIslandShape(targetWidth, targetHeight, isCompact);
+            if (_transitionVersion == transitionVersion)
+            {
+                UpdateIslandShape(targetWidth, targetHeight, isCompact);
+            }
         };
 
         // Immediately update shape structure for target bounds
@@ -1146,9 +1222,17 @@ public partial class IslandView : Window
 
     private void DismissButton_Click(object sender, RoutedEventArgs e)
     {
+        DismissIsland();
+    }
+
+    internal void DismissIsland()
+    {
         _logger?.LogInformation("Dismiss X clicked: hiding island.");
         _activationTimer.Stop();
         _hideTimer.Stop();
+        _isCursorInsideActivationZone = false;
+        _isCursorInsideIsland = false;
+        _isInteracting = false;
         TransitionToState(IslandState.Hidden);
     }
 
@@ -1160,6 +1244,10 @@ public partial class IslandView : Window
         }
         else
         {
+            _activationTimer.Stop();
+            _hideTimer.Stop();
+            _isCursorInsideActivationZone = false;
+            _isCursorInsideIsland = false;
             TransitionToState(IslandState.Hidden);
         }
     }

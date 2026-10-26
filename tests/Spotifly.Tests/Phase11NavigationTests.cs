@@ -9,6 +9,7 @@ using Xunit;
 
 namespace Spotifly.Tests;
 
+[Collection("WPF UI")]
 public class Phase11NavigationTests
 {
     [Fact]
