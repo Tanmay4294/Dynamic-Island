@@ -127,6 +127,12 @@ public class Phase3StateModelTests
             window.ProcessCursorPosition(centerScreenX, zoneY);
             window.ActivateFromCursorZone();
             Assert.Equal(IslandState.Compact, window.CurrentState);
+            window.TransitionToState(IslandState.Hidden);
+            var staleHiddenTransitionVersion = window.CurrentTransitionVersion;
+            window.TransitionToState(IslandState.Compact);
+            window.CompleteHiddenTransition(staleHiddenTransitionVersion);
+            Assert.Equal(IslandState.Compact, window.CurrentState);
+            Assert.Equal(Visibility.Visible, window.Visibility);
             window.DismissIsland();
             Assert.Equal(IslandState.Hidden, window.CurrentState);
             window.ProcessCursorPosition(centerScreenX, zoneY);

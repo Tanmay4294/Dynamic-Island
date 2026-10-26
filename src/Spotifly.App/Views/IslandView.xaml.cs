@@ -41,6 +41,7 @@ public partial class IslandView : Window
     // State machine
     private IslandState _currentState = IslandState.Hidden;
     public IslandState CurrentState => _currentState;
+    internal long CurrentTransitionVersion => _transitionVersion;
 
     // Polling & timer mechanisms for reliable cursor tracking without global hooks
     private readonly DispatcherTimer _cursorPollingTimer;
@@ -583,14 +584,7 @@ public partial class IslandView : Window
         {
             _playbackPollTimer.Stop();
             var fadeOut = new DoubleAnimation(IslandContainer.Opacity, 0.0, duration) { EasingFunction = easing };
-            fadeOut.Completed += (s, e) =>
-            {
-                if (_currentState == IslandState.Hidden && _transitionVersion == transitionVersion)
-                {
-                    Visibility = Visibility.Hidden;
-                    IslandContainer.Opacity = 1.0;
-                }
-            };
+            fadeOut.Completed += (s, e) => CompleteHiddenTransition(transitionVersion);
             IslandContainer.BeginAnimation(UIElement.OpacityProperty, fadeOut);
             return;
         }
@@ -686,6 +680,15 @@ public partial class IslandView : Window
                 }
             };
             CompactView.BeginAnimation(UIElement.OpacityProperty, compactFade);
+        }
+    }
+
+    internal void CompleteHiddenTransition(long transitionVersion)
+    {
+        if (_currentState == IslandState.Hidden && _transitionVersion == transitionVersion)
+        {
+            Visibility = Visibility.Hidden;
+            IslandContainer.Opacity = 1.0;
         }
     }
 
