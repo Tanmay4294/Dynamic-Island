@@ -276,7 +276,7 @@
                                 </Border>
 
                                 <!-- Track details, Spotify badge, and Media Playback Controls -->
-                                <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,2,0,2" VerticalAlignment="Top" HorizontalAlignment="Stretch">
+                                <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,-42,0,2" VerticalAlignment="Top" HorizontalAlignment="Stretch">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
