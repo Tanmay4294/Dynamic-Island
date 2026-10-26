@@ -259,8 +259,10 @@ public partial class IslandView : Window
                 var containerOrigin = IslandContainer.TranslatePoint(new System.Windows.Point(0, 0), this);
                 var ptInContainer = new System.Windows.Point(pointInWindow.X - containerOrigin.X, pointInWindow.Y - containerOrigin.Y);
 
-                // Check exact vector geometry hit test
-                if (_currentIslandGeometry != null && !_currentIslandGeometry.FillContains(ptInContainer))
+                // Use the same live semicircle region as cursor polling. Keeping
+                // native hit-testing and polling identical prevents WPF MouseLeave
+                // from firing while the pointer is still over the visible dome.
+                if (!IsPointInsideHoverRegion(ptInContainer))
                 {
                     handled = true;
                     return new IntPtr(HTTRANSPARENT);
@@ -586,6 +588,17 @@ public partial class IslandView : Window
 
     private void OnIslandMouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
     {
+        // MouseLeave can be raised during a layout/animation frame even when the
+        // cursor is still inside the rendered semicircle. Re-read the actual
+        // screen cursor and let the shared containment logic decide whether a
+        // hide timer is warranted instead of trusting this routed event alone.
+        if (GetCursorPos(out var screenPoint))
+        {
+            var cursorInDip = PhysicalScreenPointToDip(screenPoint.X, screenPoint.Y);
+            ProcessCursorPosition(cursorInDip.X, cursorInDip.Y);
+            return;
+        }
+
         _isCursorInsideIsland = false;
         StartHideDelayIfNeeded();
     }
