@@ -125,7 +125,7 @@ public partial class IslandView : Window
             _settingsService.SettingsChanged += OnSettingsChanged;
         }
 
-        if (_progressService != null)
+        if (_progressService != null && _spotifyService == null)
         {
             IslandProgressArc.Progress = _progressService.Progress;
             _progressService.ProgressChanged += (s, progress) =>
@@ -858,6 +858,11 @@ public partial class IslandView : Window
     private void UpdatePlaybackUI(PlaybackSnapshot snapshot)
     {
         var track = snapshot.Track;
+
+        // Spotify's playback endpoint provides progress_ms and the track duration.
+        // Keep the visual arc driven by live playback whenever that service exists;
+        // simulated progress is only used in the settings/demo-only configuration.
+        IslandProgressArc.Progress = PlaybackProgressCalculator.Normalize(snapshot.ProgressMs, snapshot.DurationMs);
 
         TrackTitleText.Text = track.Name;
         TrackArtistText.Text = snapshot.State switch
