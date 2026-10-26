@@ -55,7 +55,7 @@
                       HorizontalAlignment="Center"
                       VerticalAlignment="Top"
                       Height="38"
-                      Width="120"
+                      Width="90"
                       Margin="2,0,2,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="24" />
