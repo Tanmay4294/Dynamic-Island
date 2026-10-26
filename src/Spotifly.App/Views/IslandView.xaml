@@ -65,6 +65,7 @@
 
                     <!-- 1. Settings (Gear vector icon) -->
                     <Button x:Name="SettingsButton"
+                            Visibility="Collapsed"
                             Grid.Column="0"
                             Width="22" Height="22"
                             ToolTip="Spotifly Settings"
@@ -99,6 +100,7 @@
 
                     <!-- 3. Close / Dismiss (X vector icon) -->
                     <Button x:Name="DismissButton"
+                            Visibility="Collapsed"
                             Grid.Column="2"
                             Width="22" Height="22"
                             ToolTip="Dismiss Island (Esc)"
