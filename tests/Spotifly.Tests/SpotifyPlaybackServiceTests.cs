@@ -115,10 +115,17 @@ public class SpotifyPlaybackServiceTests
     }
 
     [Fact]
-    public async Task RefreshPlaybackAsync_Handles204NoContent_ReturnsIdleSnapshot()
+    public async Task RefreshPlaybackAsync_204AndNoDevices_ReturnsNoActiveDeviceState()
     {
         var (service, _) = CreateServiceWithHandler(req =>
         {
+            if (req.RequestUri?.AbsolutePath.EndsWith("/devices", StringComparison.Ordinal) == true)
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"devices\":[]}")
+                };
+            }
             return new HttpResponseMessage(HttpStatusCode.NoContent);
         });
 
@@ -128,7 +135,113 @@ public class SpotifyPlaybackServiceTests
         Assert.False(snapshot.IsPlaying);
         Assert.False(snapshot.HasActiveDevice);
         Assert.Equal(TrackInfo.Empty.Name, snapshot.Track.Name);
+        Assert.True(snapshot.IsAuthenticated);
+        Assert.Equal(SpotifyPlaybackState.NoActiveDevice, snapshot.State);
+        Assert.Contains("start playback", snapshot.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RefreshPlaybackAsync_204AndAvailableActiveDevice_ReturnsAuthenticatedIdleState()
+    {
+        var (service, _) = CreateServiceWithHandler(req =>
+        {
+            if (req.RequestUri?.AbsolutePath.EndsWith("/devices", StringComparison.Ordinal) == true)
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"devices\":[{\"name\":\"This PC\",\"type\":\"Computer\",\"is_active\":true}]}")
+                };
+            }
+            return new HttpResponseMessage(HttpStatusCode.NoContent);
+        });
+
+        var snapshot = await service.RefreshPlaybackAsync();
+
+        Assert.Equal(SpotifyPlaybackState.Idle, snapshot.State);
+        Assert.True(snapshot.IsAuthenticated);
+        Assert.True(snapshot.HasActiveDevice);
+        Assert.Equal("This PC", snapshot.DeviceName);
         Assert.Contains("idle", snapshot.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RefreshPlaybackAsync_Disconnected_ReturnsConnectInstructionWithoutApiRequest()
+    {
+        var auth = new SpotifyAuthService(new SpotifyConfig(), new MockTokenStore());
+        int requests = 0;
+        using var client = new HttpClient(new MockHttpMessageHandler(_ =>
+        {
+            requests++;
+            return new HttpResponseMessage(HttpStatusCode.InternalServerError);
+        }));
+        using var service = new SpotifyService(auth, new SpotifyConfig(), client);
+
+        var snapshot = await service.RefreshPlaybackAsync();
+
+        Assert.Equal(SpotifyPlaybackState.Disconnected, snapshot.State);
+        Assert.False(snapshot.IsAuthenticated);
+        Assert.Contains("Connect Spotify", snapshot.StatusMessage);
+        Assert.Equal(0, requests);
+    }
+
+    [Fact]
+    public async Task RefreshPlaybackAsync_UnauthorizedForcesTokenRefreshAndRetriesWithNewToken()
+    {
+        var config = new SpotifyConfig();
+        var store = new MockTokenStore();
+        store.SaveTokens(new SpotifyTokenData
+        {
+            AccessToken = "rejected_access_token",
+            RefreshToken = "refresh_credential",
+            ExpiresAtUtc = DateTime.UtcNow.AddHours(1)
+        });
+        int playbackCalls = 0;
+        using var client = new HttpClient(new MockHttpMessageHandler(req =>
+        {
+            if (req.RequestUri?.AbsolutePath == "/api/token")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"access_token\":\"refreshed_access_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}")
+                };
+            }
+
+            playbackCalls++;
+            if (playbackCalls == 1)
+            {
+                return new HttpResponseMessage(HttpStatusCode.Unauthorized);
+            }
+
+            Assert.Equal("refreshed_access_token", req.Headers.Authorization?.Parameter);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"is_playing\":true,\"currently_playing_type\":\"track\",\"device\":{\"name\":\"This PC\",\"type\":\"Computer\",\"is_active\":true},\"item\":{\"name\":\"Test Track\",\"duration_ms\":180000,\"artists\":[{\"name\":\"Test Artist\"}]}}")
+            };
+        }));
+        var auth = new SpotifyAuthService(config, store, client);
+        using var service = new SpotifyService(auth, config, client);
+
+        var snapshot = await service.RefreshPlaybackAsync();
+
+        Assert.Equal(2, playbackCalls);
+        Assert.Equal(SpotifyPlaybackState.Playing, snapshot.State);
+        Assert.Equal("Test Track", snapshot.Track.Name);
+        Assert.Equal("Test Artist", snapshot.Track.ArtistName);
+        Assert.Equal("refreshed_access_token", store.LoadTokens()?.AccessToken);
+    }
+
+    [Theory]
+    [InlineData(429)]
+    [InlineData(500)]
+    public async Task RefreshPlaybackAsync_ApiErrorsReplaceStaleStatusWithRetryMessage(int statusCode)
+    {
+        var (service, _) = CreateServiceWithHandler(_ => new HttpResponseMessage((HttpStatusCode)statusCode));
+
+        var snapshot = await service.RefreshPlaybackAsync();
+
+        Assert.Equal(SpotifyPlaybackState.Error, snapshot.State);
+        Assert.True(snapshot.IsAuthenticated);
+        Assert.Contains(statusCode == 429 ? "rate limiting" : $"HTTP {statusCode}", snapshot.StatusMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

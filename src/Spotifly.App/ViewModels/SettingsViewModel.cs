@@ -44,11 +44,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(IsSpotifyConnected));
                 OnPropertyChanged(nameof(SpotifyConnectionStatusText));
-                if (isConnected)
-                {
-                    _ = RefreshProfileAsync();
-                }
-                else
+                if (!isConnected)
                 {
                     SpotifyProfileText = "Not connected";
                 }
@@ -284,6 +280,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     public bool IsSpotifyConnected => _authService?.IsConnected ?? false;
 
     public string SpotifyConnectionStatusText => IsSpotifyConnected ? "Connected" : "Disconnected";
+    public string SpotifyRedirectUri => _authService?.RedirectUri ?? string.Empty;
 
     private string _spotifyProfileText = "Not connected";
     public string SpotifyProfileText
@@ -394,7 +391,15 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
             }
             else
             {
-                SpotifyStatusMessage = "Connected, but could not load user profile.";
+                if (IsSpotifyConnected)
+                {
+                    SpotifyStatusMessage = "Spotify credentials are stored, but the profile could not be loaded. Check network access and the Spotify app allowlist.";
+                }
+                else
+                {
+                    SpotifyProfileText = "Not connected";
+                    SpotifyStatusMessage = "Spotify authorization could not be refreshed. Reconnect Spotify.";
+                }
             }
         }
         catch (Exception ex)

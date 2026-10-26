@@ -58,9 +58,8 @@ public sealed class SpotifyApiService : ISpotifyApiService, IDisposable
 
             if (response.StatusCode == HttpStatusCode.Unauthorized) // 401
             {
-                _logger?.LogWarning("Spotify API returned 401 Unauthorized. Retrying once after forced token refresh.");
-                // Retry once
-                token = await _authService.GetValidAccessTokenAsync(cancellationToken);
+                _logger?.LogWarning("Spotify profile request returned HTTP 401; forcing a token refresh and retrying once.");
+                token = await _authService.RefreshAccessTokenAsync(cancellationToken);
                 if (string.IsNullOrEmpty(token)) return null;
 
                 using var retryRequest = new HttpRequestMessage(HttpMethod.Get, url);
@@ -83,9 +82,13 @@ public sealed class SpotifyApiService : ISpotifyApiService, IDisposable
         if (response.StatusCode == (HttpStatusCode)429) // 429 Too Many Requests
         {
             int retryAfterSec = 5;
-            if (response.Headers.TryGetValues("Retry-After", out var values))
+            if (response.Headers.RetryAfter?.Delta is { } retryDelay)
             {
-                int.TryParse(values.FirstOrDefault(), out retryAfterSec);
+                retryAfterSec = Math.Max(1, (int)Math.Ceiling(retryDelay.TotalSeconds));
+            }
+            else if (response.Headers.RetryAfter?.Date is { } retryDate)
+            {
+                retryAfterSec = Math.Max(1, (int)Math.Ceiling((retryDate - DateTimeOffset.UtcNow).TotalSeconds));
             }
             _logger?.LogWarning($"Spotify rate limit exceeded (HTTP 429). Retry-After: {retryAfterSec}s.");
             throw new InvalidOperationException($"Spotify API rate limit reached. Please wait {retryAfterSec} seconds before retrying.");

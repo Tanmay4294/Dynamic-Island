@@ -1,5 +1,16 @@
 namespace Spotifly.App.Models;
 
+public enum SpotifyPlaybackState
+{
+    Disconnected,
+    Connecting,
+    Idle,
+    Playing,
+    Paused,
+    NoActiveDevice,
+    Error
+}
+
 /// <summary>
 /// Snapshot of Spotify's playback state at a specific point in time.
 /// Includes active track, playing/paused state, active device information,
@@ -15,6 +26,8 @@ public sealed class PlaybackSnapshot
     public string? DeviceType { get; init; }
     public bool HasActiveDevice { get; init; }
     public bool IsSpotifyRunning { get; init; } = true;
+    public bool IsAuthenticated { get; init; }
+    public SpotifyPlaybackState State { get; init; } = SpotifyPlaybackState.Disconnected;
     public DateTime SnapshotTimeUtc { get; init; } = DateTime.UtcNow;
     public string? StatusMessage { get; init; }
 
@@ -28,7 +41,9 @@ public sealed class PlaybackSnapshot
         DeviceType = null,
         HasActiveDevice = false,
         IsSpotifyRunning = false,
+        IsAuthenticated = false,
+        State = SpotifyPlaybackState.Disconnected,
         SnapshotTimeUtc = DateTime.UtcNow,
-        StatusMessage = "No active Spotify playback"
+        StatusMessage = "Connect Spotify in Settings to see playback."
     };
 }

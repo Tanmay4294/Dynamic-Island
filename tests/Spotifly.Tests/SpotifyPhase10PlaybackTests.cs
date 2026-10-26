@@ -126,12 +126,21 @@ public class SpotifyPhase10PlaybackTests
         int callCount = 0;
         var (service, store) = CreateServiceWithHandler(req =>
         {
+            if (req.RequestUri?.AbsolutePath == "/api/token")
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"access_token\":\"refreshed_phase10_token\",\"token_type\":\"Bearer\",\"expires_in\":3600}")
+                });
+            }
+
             callCount++;
             if (callCount == 1)
             {
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized));
             }
 
+            Assert.Equal("refreshed_phase10_token", req.Headers.Authorization?.Parameter);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));
         });
 

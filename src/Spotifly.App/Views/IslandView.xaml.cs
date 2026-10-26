@@ -147,9 +147,14 @@ public partial class IslandView : Window
         // Lightweight playback poll timer: polls every 3.5 seconds only when island is visible
         _playbackPollTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(3500)
+            Interval = TimeSpan.FromSeconds(15)
         };
         _playbackPollTimer.Tick += OnPlaybackPollTick;
+        if (_authService != null)
+        {
+            _authService.ConnectionStatusChanged += OnSpotifyConnectionStatusChanged;
+            _authService.AuthenticationStateChanged += OnSpotifyAuthenticationStateChanged;
+        }
 
         // Non-blocking toast notification dismissal timer (Phase 10)
         _toastTimer = new DispatcherTimer
@@ -802,7 +807,35 @@ public partial class IslandView : Window
 
     private void OnPlaybackChanged(object? sender, PlaybackSnapshot snapshot)
     {
-        Dispatcher.InvokeAsync(() => UpdatePlaybackUI(snapshot));
+        Dispatcher.InvokeAsync(() =>
+        {
+            _playbackPollTimer.Interval = snapshot.IsAuthenticated
+                ? TimeSpan.FromMilliseconds(3500)
+                : TimeSpan.FromSeconds(15);
+            UpdatePlaybackUI(snapshot);
+        });
+    }
+
+    private void OnSpotifyConnectionStatusChanged(object? sender, bool isConnected)
+    {
+        Dispatcher.InvokeAsync(() =>
+        {
+            if (_spotifyService != null && Visibility == Visibility.Visible)
+            {
+                _ = _spotifyService.RefreshPlaybackAsync();
+            }
+        });
+    }
+
+    private void OnSpotifyAuthenticationStateChanged(object? sender, bool isAuthenticating)
+    {
+        Dispatcher.InvokeAsync(() =>
+        {
+            if (_spotifyService != null && Visibility == Visibility.Visible)
+            {
+                _ = _spotifyService.RefreshPlaybackAsync();
+            }
+        });
     }
 
     private void UpdatePlaybackUI(PlaybackSnapshot snapshot)
@@ -810,7 +843,15 @@ public partial class IslandView : Window
         var track = snapshot.Track;
 
         TrackTitleText.Text = track.Name;
-        TrackArtistText.Text = track.ArtistName;
+        TrackArtistText.Text = snapshot.State switch
+        {
+            SpotifyPlaybackState.Disconnected => "Connect Spotify in Settings",
+            SpotifyPlaybackState.Connecting => "Connecting to Spotify...",
+            SpotifyPlaybackState.Idle => "Spotify is idle",
+            SpotifyPlaybackState.NoActiveDevice => "Open Spotify and start playback",
+            SpotifyPlaybackState.Error => snapshot.StatusMessage ?? "Spotify connection needs attention",
+            _ => track.ArtistName
+        };
 
         // Play/Pause Icon state: Pause icon when playing, Play triangle when paused
         if (snapshot.IsPlaying)
@@ -834,9 +875,30 @@ public partial class IslandView : Window
         }
         else
         {
-            PlaybackDeviceText.Text = snapshot.StatusMessage ?? "Idle";
+            PlaybackDeviceText.Text = snapshot.State switch
+            {
+                SpotifyPlaybackState.Disconnected => "Not connected",
+                SpotifyPlaybackState.Connecting => "Connecting...",
+                SpotifyPlaybackState.Idle => "Idle",
+                SpotifyPlaybackState.NoActiveDevice => "No active device",
+                SpotifyPlaybackState.Error => "Spotify unavailable",
+                _ => snapshot.StatusMessage ?? "Idle"
+            };
             PlaybackDeviceText.ToolTip = snapshot.StatusMessage;
         }
+
+        bool canControlPlayback = snapshot.IsAuthenticated && snapshot.HasActiveDevice;
+        PreviousTrackButton.IsEnabled = canControlPlayback;
+        PlayPauseButton.IsEnabled = canControlPlayback;
+        NextTrackButton.IsEnabled = canControlPlayback;
+        var controlHint = !snapshot.IsAuthenticated
+            ? "Connect Spotify in Settings to enable playback controls."
+            : !snapshot.HasActiveDevice
+                ? "Start playback on an active Spotify device to enable controls."
+                : null;
+        PreviousTrackButton.ToolTip = canControlPlayback ? "Previous Track" : controlHint;
+        PlayPauseButton.ToolTip = canControlPlayback ? (snapshot.IsPlaying ? "Pause" : "Play") : controlHint;
+        NextTrackButton.ToolTip = canControlPlayback ? "Next Track" : controlHint;
 
         // Album Artwork loading & caching (avoids re-decoding when track artwork hasn't changed)
         if (track.HasArtwork && !string.IsNullOrEmpty(track.ArtworkUrl))
@@ -1265,6 +1327,11 @@ public partial class IslandView : Window
             _hideTimer.Stop();
             _playbackPollTimer.Stop();
             SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+            if (_authService != null)
+            {
+                _authService.ConnectionStatusChanged -= OnSpotifyConnectionStatusChanged;
+                _authService.AuthenticationStateChanged -= OnSpotifyAuthenticationStateChanged;
+            }
         }
 
         base.OnClosed(e);

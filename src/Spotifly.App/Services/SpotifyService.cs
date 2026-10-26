@@ -44,6 +44,7 @@ public sealed class SpotifyService : ISpotifyService, IDisposable
     private readonly SemaphoreSlim _playlistLock = new(1, 1);
     private readonly Dictionary<string, (IReadOnlyList<TrackInfo> tracks, DateTime cachedAt)> _playlistTrackCache = new();
     private readonly SemaphoreSlim _trackLock = new(1, 1);
+    private readonly SemaphoreSlim _playbackRefreshLock = new(1, 1);
     private readonly bool _ownsHttpClient;
     private bool _disposed;
 
@@ -68,120 +69,225 @@ public sealed class SpotifyService : ISpotifyService, IDisposable
 
     public async Task<PlaybackSnapshot> RefreshPlaybackAsync(CancellationToken cancellationToken = default)
     {
-        string? token = await _authService.GetValidAccessTokenAsync(cancellationToken);
-        if (string.IsNullOrEmpty(token))
+        if (!await _playbackRefreshLock.WaitAsync(0, cancellationToken))
         {
-            SetPlayback(PlaybackSnapshot.Empty);
             return _currentPlayback;
         }
 
-        string url = $"{_config.ApiBaseUrl}/me/player?additional_types=track,episode";
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
         try
         {
+            string? token = await _authService.GetValidAccessTokenAsync(cancellationToken);
+            if (string.IsNullOrEmpty(token))
+            {
+                var unavailable = _authService.IsAuthenticating
+                    ? new PlaybackSnapshot
+                    {
+                        Track = TrackInfo.Empty,
+                        IsPlaying = false,
+                        IsAuthenticated = false,
+                        State = SpotifyPlaybackState.Connecting,
+                        StatusMessage = "Complete Spotify authorization in your browser.",
+                        SnapshotTimeUtc = DateTime.UtcNow
+                    }
+                    : _authService.IsConnected
+                    ? CreateErrorSnapshot("Spotify authorization needs attention. Reconnect Spotify in Settings.")
+                    : PlaybackSnapshot.Empty;
+                SetPlayback(unavailable);
+                _logger?.LogInformation(_authService.IsConnected
+                    ? "Playback refresh skipped because valid authorization is temporarily unavailable."
+                    : "Playback refresh skipped because Spotify is not connected.");
+                return unavailable;
+            }
+
+            string url = $"{_config.ApiBaseUrl}/me/player?additional_types=track,episode";
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
             using var response = await _httpClient.SendAsync(request, cancellationToken);
 
             if (response.StatusCode == HttpStatusCode.NoContent) // 204: Active session not playing / no active player
             {
-                var inactive = new PlaybackSnapshot
-                {
-                    Track = TrackInfo.Empty,
-                    IsPlaying = false,
-                    HasActiveDevice = false,
-                    IsSpotifyRunning = true,
-                    StatusMessage = "Spotify is idle (no active device playing)"
-                };
-                SetPlayback(inactive);
-                return inactive;
+                return await ResolveNoPlaybackAsync(token, cancellationToken);
             }
 
             if (response.StatusCode == HttpStatusCode.Unauthorized) // 401: Token expired
             {
                 _logger?.LogWarning("Playback request returned 401. Retrying once after token refresh.");
-                token = await _authService.GetValidAccessTokenAsync(cancellationToken);
+                token = await _authService.RefreshAccessTokenAsync(cancellationToken);
                 if (string.IsNullOrEmpty(token))
                 {
-                    SetPlayback(PlaybackSnapshot.Empty);
+                    var unauthorized = _authService.IsConnected
+                        ? CreateErrorSnapshot("Spotify authorization was rejected. Reconnect Spotify in Settings.")
+                        : PlaybackSnapshot.Empty;
+                    SetPlayback(unauthorized);
                     return _currentPlayback;
                 }
 
                 using var retryReq = new HttpRequestMessage(HttpMethod.Get, url);
                 retryReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 using var retryRes = await _httpClient.SendAsync(retryReq, cancellationToken);
+                if (retryRes.StatusCode == HttpStatusCode.NoContent)
+                {
+                    return await ResolveNoPlaybackAsync(token, cancellationToken);
+                }
                 return await ParsePlaybackResponseAsync(retryRes, cancellationToken);
             }
 
             return await ParsePlaybackResponseAsync(response, cancellationToken);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (HttpRequestException ex)
         {
-            _logger?.LogError("Network failure during playback refresh.", ex);
-            var err = new PlaybackSnapshot
-            {
-                Track = _currentPlayback.Track,
-                IsPlaying = false,
-                HasActiveDevice = false,
-                IsSpotifyRunning = false,
-                StatusMessage = "Network connection to Spotify failed."
-            };
-            SetPlayback(err);
-            return err;
+            _logger?.LogError("Network failure during Spotify playback refresh.", ex);
+            var error = CreateErrorSnapshot("Could not reach Spotify. Check your network and try again.");
+            SetPlayback(error);
+            return error;
         }
+        catch (Exception)
+        {
+            _logger?.LogError("Unexpected error during Spotify playback refresh.");
+            var error = CreateErrorSnapshot("Spotify playback could not be read. Reconnect in Settings if the problem continues.");
+            SetPlayback(error);
+            return error;
+        }
+        finally
+        {
+            _playbackRefreshLock.Release();
+        }
+    }
+
+    private async Task<PlaybackSnapshot> ResolveNoPlaybackAsync(string? token, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(token))
+        {
+            var unauthenticated = _authService.IsConnected
+                ? CreateErrorSnapshot("Spotify authorization needs attention. Reconnect Spotify in Settings.")
+                : PlaybackSnapshot.Empty;
+            SetPlayback(unauthenticated);
+            return unauthenticated;
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.ApiBaseUrl}/me/player/devices");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            _logger?.LogWarning("Spotify devices request returned HTTP 401; forcing a token refresh and retrying once.");
+            token = await _authService.RefreshAccessTokenAsync(cancellationToken);
+            if (string.IsNullOrEmpty(token))
+            {
+                var unauthorized = _authService.IsConnected
+                    ? CreateErrorSnapshot("Spotify authorization was rejected. Reconnect Spotify in Settings.")
+                    : PlaybackSnapshot.Empty;
+                SetPlayback(unauthorized);
+                return unauthorized;
+            }
+
+            using var retryRequest = new HttpRequestMessage(HttpMethod.Get, $"{_config.ApiBaseUrl}/me/player/devices");
+            retryRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            using var retryResponse = await _httpClient.SendAsync(retryRequest, cancellationToken);
+            return await ParseDevicesResponseAsync(retryResponse, cancellationToken);
+        }
+        return await ParseDevicesResponseAsync(response, cancellationToken);
+    }
+
+    private async Task<PlaybackSnapshot> ParseDevicesResponseAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        if (!response.IsSuccessStatusCode)
+        {
+            return await ParsePlaybackResponseAsync(response, cancellationToken);
+        }
+
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var devices = JsonSerializer.Deserialize<SpotifyDevicesResponse>(json)?.Devices ?? new List<SpotifyDevice>();
+        var activeDevice = devices.FirstOrDefault(device => device.IsActive);
+        var hasAvailableDevice = devices.Count > 0;
+        var state = activeDevice != null ? SpotifyPlaybackState.Idle : SpotifyPlaybackState.NoActiveDevice;
+        var message = activeDevice != null
+            ? $"Spotify is idle on {activeDevice.Name}. Start playback in Spotify."
+            : hasAvailableDevice
+                ? "A Spotify device is available, but none is active. Select this PC in Spotify and start playback."
+                : "No Spotify playback device is available. Open Spotify on this PC and start playback.";
+
+        var snapshot = new PlaybackSnapshot
+        {
+            Track = TrackInfo.Empty,
+            IsPlaying = false,
+            HasActiveDevice = activeDevice != null,
+            DeviceName = activeDevice?.Name,
+            DeviceType = activeDevice?.Type,
+            IsSpotifyRunning = activeDevice != null,
+            IsAuthenticated = true,
+            State = state,
+            StatusMessage = message,
+            SnapshotTimeUtc = DateTime.UtcNow
+        };
+        SetPlayback(snapshot);
+        return snapshot;
     }
 
     private async Task<PlaybackSnapshot> ParsePlaybackResponseAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         if (response.StatusCode == (HttpStatusCode)429)
         {
-            _logger?.LogWarning("Rate limit reached on playback endpoint (HTTP 429).");
-            return _currentPlayback;
+            var retryAfter = GetRetryAfterSeconds(response);
+            _logger?.LogWarning($"Playback endpoint rate limited (HTTP 429); retry after {retryAfter} seconds.");
+            var limited = CreateErrorSnapshot($"Spotify is rate limiting requests. Retrying in about {retryAfter} seconds.");
+            SetPlayback(limited);
+            return limited;
         }
 
         if (response.StatusCode == HttpStatusCode.Forbidden)
         {
-            _logger?.LogWarning("Forbidden (403): User may lack Premium or playback permissions.");
-            var err = new PlaybackSnapshot
-            {
-                Track = TrackInfo.Empty,
-                IsPlaying = false,
-                HasActiveDevice = false,
-                IsSpotifyRunning = true,
-                StatusMessage = "Spotify account not authorized or requires Premium."
-            };
-            SetPlayback(err);
-            return err;
+            _logger?.LogWarning("Playback endpoint returned HTTP 403; authorization, account access, or required permissions may be insufficient.");
+            var forbidden = CreateErrorSnapshot("Spotify denied playback access. Reconnect Spotify in Settings and check account playback eligibility.");
+            SetPlayback(forbidden);
+            return forbidden;
         }
 
         if (!response.IsSuccessStatusCode)
         {
             _logger?.LogWarning($"Playback query failed with HTTP {(int)response.StatusCode}.");
-            return _currentPlayback;
+            var error = CreateErrorSnapshot($"Spotify playback request failed (HTTP {(int)response.StatusCode}). Try again shortly.");
+            SetPlayback(error);
+            return error;
         }
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(json))
         {
-            var empty = new PlaybackSnapshot
-            {
-                Track = TrackInfo.Empty,
-                IsPlaying = false,
-                HasActiveDevice = false,
-                IsSpotifyRunning = true,
-                StatusMessage = "Spotify is idle"
-            };
-            SetPlayback(empty);
-            return empty;
+            var error = CreateErrorSnapshot("Spotify returned an empty playback response. Try again shortly.");
+            SetPlayback(error);
+            return error;
         }
 
         var model = JsonSerializer.Deserialize<SpotifyPlaybackResponse>(json);
         if (model == null)
         {
-            return _currentPlayback;
+            var error = CreateErrorSnapshot("Spotify returned an unreadable playback response. Try again shortly.");
+            SetPlayback(error);
+            return error;
         }
 
         var track = MapItemToTrackInfo(model.Item, model.CurrentlyPlayingType);
+        var hasActiveDevice = model.Device?.IsActive ?? false;
+        var hasTrack = model.Item != null;
+        var state = !hasActiveDevice
+            ? SpotifyPlaybackState.NoActiveDevice
+            : model.IsPlaying
+                ? SpotifyPlaybackState.Playing
+                : hasTrack
+                    ? SpotifyPlaybackState.Paused
+                    : SpotifyPlaybackState.Idle;
+        var statusMessage = state switch
+        {
+            SpotifyPlaybackState.NoActiveDevice => "No active Spotify device. Open Spotify on this PC and start playback.",
+            SpotifyPlaybackState.Idle => "Spotify is idle. Start playback on this device.",
+            SpotifyPlaybackState.Paused => "Paused",
+            _ => model.IsPlaying ? "Playing" : "Paused"
+        };
         var snapshot = new PlaybackSnapshot
         {
             Track = track,
@@ -190,14 +296,41 @@ public sealed class SpotifyService : ISpotifyService, IDisposable
             DurationMs = model.Item?.DurationMs,
             DeviceName = model.Device?.Name,
             DeviceType = model.Device?.Type,
-            HasActiveDevice = model.Device?.IsActive ?? false,
+            HasActiveDevice = hasActiveDevice,
             IsSpotifyRunning = true,
+            IsAuthenticated = true,
+            State = state,
             SnapshotTimeUtc = DateTime.UtcNow,
-            StatusMessage = model.IsPlaying ? "Playing" : "Paused"
+            StatusMessage = statusMessage
         };
 
         SetPlayback(snapshot);
         return snapshot;
+    }
+
+    private PlaybackSnapshot CreateErrorSnapshot(string message) => new()
+    {
+        Track = TrackInfo.Empty,
+        IsPlaying = false,
+        HasActiveDevice = false,
+        IsSpotifyRunning = false,
+        IsAuthenticated = _authService.IsConnected,
+        State = SpotifyPlaybackState.Error,
+        StatusMessage = message,
+        SnapshotTimeUtc = DateTime.UtcNow
+    };
+
+    private static int GetRetryAfterSeconds(HttpResponseMessage response)
+    {
+        if (response.Headers.RetryAfter?.Delta is { } delay)
+        {
+            return Math.Max(1, (int)Math.Ceiling(delay.TotalSeconds));
+        }
+        if (response.Headers.RetryAfter?.Date is { } date)
+        {
+            return Math.Max(1, (int)Math.Ceiling((date - DateTimeOffset.UtcNow).TotalSeconds));
+        }
+        return 5;
     }
 
     private static TrackInfo MapItemToTrackInfo(SpotifyItem? item, string? itemType)
@@ -316,28 +449,82 @@ public sealed class SpotifyService : ISpotifyService, IDisposable
             if (response.StatusCode == HttpStatusCode.NoContent) // 204: Successful player command
             {
                 _logger?.LogInformation($"Player command {method} {endpointPath} succeeded (HTTP 204).");
-                // Trigger refresh shortly after to sync snapshot
-                _ = Task.Run(async () =>
-                {
-                    await Task.Delay(400, cancellationToken);
-                    await RefreshPlaybackAsync(cancellationToken);
-                }, cancellationToken);
+                SchedulePlaybackRefresh(cancellationToken);
                 return true;
             }
 
             if (response.StatusCode == HttpStatusCode.NotFound) // 404: No active device found
             {
-                _logger?.LogWarning($"Player command {method} {endpointPath} failed (HTTP 404): No active Spotify player device.");
+                _logger?.LogWarning($"Player command {method} {endpointPath} failed with HTTP 404; there is no active Spotify device.");
+                SetPlayback(new PlaybackSnapshot
+                {
+                    Track = TrackInfo.Empty,
+                    IsAuthenticated = true,
+                    State = SpotifyPlaybackState.NoActiveDevice,
+                    StatusMessage = "No active Spotify device. Open Spotify on this PC and start playback.",
+                    SnapshotTimeUtc = DateTime.UtcNow
+                });
+                return false;
+            }
+
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                _logger?.LogWarning($"Player command {method} {endpointPath} returned HTTP 401; refreshing authorization and retrying once.");
+                token = await _authService.RefreshAccessTokenAsync(cancellationToken);
+                if (string.IsNullOrEmpty(token))
+                {
+                    SetPlayback(_authService.IsConnected
+                        ? CreateErrorSnapshot("Spotify authorization was rejected. Reconnect Spotify in Settings.")
+                        : PlaybackSnapshot.Empty);
+                    return false;
+                }
+
+                using var retryRequest = new HttpRequestMessage(method, url);
+                retryRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                using var retryResponse = await _httpClient.SendAsync(retryRequest, cancellationToken);
+                if (retryResponse.StatusCode == HttpStatusCode.NoContent)
+                {
+                    SchedulePlaybackRefresh(cancellationToken);
+                    return true;
+                }
+                _logger?.LogWarning($"Retried player command {method} {endpointPath} returned HTTP {(int)retryResponse.StatusCode}.");
+                if (retryResponse.StatusCode == HttpStatusCode.Unauthorized)
+                {
+                    SetPlayback(CreateErrorSnapshot("Spotify rejected the refreshed authorization. Reconnect Spotify in Settings."));
+                }
+                else if (retryResponse.StatusCode == HttpStatusCode.Forbidden)
+                {
+                    SetPlayback(CreateErrorSnapshot("Spotify denied playback control. Check account playback eligibility and reconnect in Settings."));
+                }
+                else if (retryResponse.StatusCode == (HttpStatusCode)429)
+                {
+                    SetPlayback(CreateErrorSnapshot("Spotify is rate limiting playback controls. Try again shortly."));
+                }
+                else if ((int)retryResponse.StatusCode >= 500)
+                {
+                    SetPlayback(CreateErrorSnapshot("Spotify playback controls are temporarily unavailable. Try again shortly."));
+                }
                 return false;
             }
 
             if (response.StatusCode == HttpStatusCode.Forbidden) // 403: Premium required or restricted
             {
-                _logger?.LogWarning($"Player command {method} {endpointPath} failed (HTTP 403): Premium account or player permission required.");
+                _logger?.LogWarning($"Player command {method} {endpointPath} failed with HTTP 403; account playback access or permissions may be insufficient.");
+                SetPlayback(CreateErrorSnapshot("Spotify denied playback control. Check account playback eligibility and reconnect in Settings."));
+                return false;
+            }
+
+            if (response.StatusCode == (HttpStatusCode)429)
+            {
+                SetPlayback(CreateErrorSnapshot("Spotify is rate limiting playback controls. Try again shortly."));
                 return false;
             }
 
             _logger?.LogWarning($"Player command {method} {endpointPath} returned HTTP {(int)response.StatusCode}.");
+            if ((int)response.StatusCode >= 500)
+            {
+                SetPlayback(CreateErrorSnapshot("Spotify playback controls are temporarily unavailable. Try again shortly."));
+            }
             return false;
         }
         catch (Exception ex)
@@ -589,7 +776,7 @@ public sealed class SpotifyService : ISpotifyService, IDisposable
 
             var result = allTracks.AsReadOnly();
             _playlistTrackCache[playlistId] = (result, DateTime.UtcNow);
-            _logger?.LogInformation($"Retrieved and cached {result.Count} tracks for playlist {playlistId}.");
+            _logger?.LogInformation($"Retrieved and cached {result.Count} Spotify playlist tracks.");
             return result;
         }
         catch (OperationCanceledException)
@@ -597,9 +784,9 @@ public sealed class SpotifyService : ISpotifyService, IDisposable
             _logger?.LogInformation("Playlist track retrieval was cancelled.");
             return Array.Empty<TrackInfo>();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger?.LogError($"Error retrieving tracks for playlist {playlistId}.", ex);
+            _logger?.LogError("Error retrieving Spotify playlist tracks.");
             return Array.Empty<TrackInfo>();
         }
         finally
@@ -684,7 +871,7 @@ public sealed class SpotifyService : ISpotifyService, IDisposable
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
                 _logger?.LogWarning("PlayTrack returned 401. Refreshing token and retrying once.");
-                token = await _authService.GetValidAccessTokenAsync(cancellationToken);
+                token = await _authService.RefreshAccessTokenAsync(cancellationToken);
                 if (string.IsNullOrEmpty(token))
                 {
                     return PlaybackCommandResult.Unauthorized();
@@ -707,12 +894,12 @@ public sealed class SpotifyService : ISpotifyService, IDisposable
         }
         catch (HttpRequestException ex)
         {
-            _logger?.LogError($"Network error during PlayTrack for {trackUri}.", ex);
+            _logger?.LogError("Network error during Spotify play request.");
             return PlaybackCommandResult.Network(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Unexpected error executing PlayTrack for {trackUri}.", ex);
+            _logger?.LogError("Unexpected error executing Spotify play request.");
             return PlaybackCommandResult.GenericFailure(ex.Message);
         }
     }
@@ -721,40 +908,54 @@ public sealed class SpotifyService : ISpotifyService, IDisposable
     {
         if (response.StatusCode == HttpStatusCode.NoContent) // 204
         {
-            _logger?.LogInformation($"Initiated playback for track {trackUri} (HTTP 204).");
-            _ = Task.Run(async () =>
-            {
-                await Task.Delay(400, cancellationToken);
-                await RefreshPlaybackAsync(cancellationToken);
-            }, cancellationToken);
+            _logger?.LogInformation("Spotify accepted the playback start request (HTTP 204).");
+            SchedulePlaybackRefresh(cancellationToken);
             return PlaybackCommandResult.SuccessResult();
         }
 
         if (response.StatusCode == HttpStatusCode.NotFound) // 404
         {
-            _logger?.LogWarning("PlayTrack failed: No active Spotify player device.");
+            _logger?.LogWarning("PlayTrack failed with HTTP 404; there is no active Spotify device.");
+            SetPlayback(new PlaybackSnapshot
+            {
+                Track = TrackInfo.Empty,
+                IsAuthenticated = true,
+                State = SpotifyPlaybackState.NoActiveDevice,
+                StatusMessage = "No active Spotify device. Open Spotify on this PC and start playback.",
+                SnapshotTimeUtc = DateTime.UtcNow
+            });
             return PlaybackCommandResult.NoDevice();
         }
 
         if (response.StatusCode == HttpStatusCode.Forbidden) // 403
         {
-            _logger?.LogWarning("PlayTrack failed: Forbidden (Premium required or user restricted).");
+            _logger?.LogWarning("PlayTrack failed with HTTP 403; account playback access or permissions may be insufficient.");
+            SetPlayback(CreateErrorSnapshot("Spotify denied playback control. Check account playback eligibility and reconnect in Settings."));
             return PlaybackCommandResult.Restricted();
         }
 
         if (response.StatusCode == (HttpStatusCode)429) // 429
         {
-            int retrySec = 5;
-            if (response.Headers.TryGetValues("Retry-After", out var vals))
+            int retrySec = GetRetryAfterSeconds(response);
+            if (response.Headers.TryGetValues("Retry-After", out var vals) && int.TryParse(vals.FirstOrDefault(), out var headerRetry))
             {
-                int.TryParse(vals.FirstOrDefault(), out retrySec);
+                retrySec = Math.Max(1, headerRetry);
             }
-            _logger?.LogWarning($"PlayTrack failed: Rate limited (HTTP 429). Retry-After: {retrySec}s.");
+            _logger?.LogWarning($"PlayTrack failed with HTTP 429; retry after {retrySec} seconds.");
+            SetPlayback(CreateErrorSnapshot($"Spotify is rate limiting playback requests. Retry after {retrySec} seconds."));
             return PlaybackCommandResult.RateLimited(retrySec);
         }
 
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            SetPlayback(_authService.IsConnected
+                ? CreateErrorSnapshot("Spotify authorization was rejected. Reconnect Spotify in Settings.")
+                : PlaybackSnapshot.Empty);
+            return PlaybackCommandResult.Unauthorized();
+        }
+
         var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-        _logger?.LogWarning($"PlayTrack returned HTTP {(int)response.StatusCode}. Response: {errorBody}");
+        _logger?.LogWarning($"PlayTrack returned HTTP {(int)response.StatusCode}.");
 
         if (errorBody.Contains("NO_ACTIVE_DEVICE", StringComparison.OrdinalIgnoreCase))
         {
@@ -776,8 +977,27 @@ public sealed class SpotifyService : ISpotifyService, IDisposable
 
     private void SetPlayback(PlaybackSnapshot snapshot)
     {
+        if (_currentPlayback.State != snapshot.State ||
+            _currentPlayback.IsAuthenticated != snapshot.IsAuthenticated ||
+            _currentPlayback.HasActiveDevice != snapshot.HasActiveDevice)
+        {
+            _logger?.LogInformation($"Spotify playback state changed to {snapshot.State}; authenticated={snapshot.IsAuthenticated}; activeDevice={snapshot.HasActiveDevice}.");
+        }
         _currentPlayback = snapshot;
         PlaybackChanged?.Invoke(this, snapshot);
+    }
+
+    private void SchedulePlaybackRefresh(CancellationToken cancellationToken)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(400, cancellationToken);
+                await RefreshPlaybackAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) { }
+        }, cancellationToken);
     }
 
     public void Dispose()

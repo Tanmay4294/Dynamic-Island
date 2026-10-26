@@ -36,6 +36,14 @@
                            Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
                            Margin="0,0,0,8" />
 
+                        <TextBlock FontSize="10"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
+                                   Margin="0,0,0,8">
+                            <Run Text="Redirect URI (must match your Spotify app settings): " />
+                            <Run Text="{Binding SpotifyRedirectUri}" FontWeight="SemiBold" />
+                        </TextBlock>
+
                 <Border Background="{DynamicResource IslandCardBackgroundBrush}"
                         BorderBrush="{DynamicResource IslandCardBorderBrush}"
                         BorderThickness="1"
@@ -47,8 +55,7 @@
                         <Grid Margin="0,0,0,10">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <!-- Status Indicator Dot -->
-                                <Ellipse Width="8" Height="8" Margin="0,0,8,0"
-                                         Fill="{Binding IsSpotifyConnected, Converter={x:Null}}">
+                                 <Ellipse Width="8" Height="8" Margin="0,0,8,0">
                                     <Ellipse.Style>
                                         <Style TargetType="Ellipse">
                                             <Setter Property="Fill" Value="#FF6B6B" />
@@ -83,7 +90,7 @@
                         <!-- Action Buttons -->
                         <Grid>
                             <!-- Connect / Reconnect Button -->
-                            <Button Content="{Binding IsSpotifyConnected, Converter={x:Null}}"
+                            <Button
                                     Height="30" Width="130"
                                     HorizontalAlignment="Left"
                                     Cursor="Hand"

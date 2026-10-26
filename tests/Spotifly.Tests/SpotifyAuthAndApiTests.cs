@@ -11,6 +11,19 @@ namespace Spotifly.Tests;
 public class SpotifyAuthAndApiTests
 {
     [Fact]
+    public void SpotifyConfig_UsesLoopbackRedirectAndPlaybackScopes()
+    {
+        var config = new SpotifyConfig();
+
+        Assert.Equal("http://127.0.0.1:43821/callback", config.RedirectUri);
+        Assert.Contains("user-read-playback-state", config.Scopes);
+        Assert.Contains("user-modify-playback-state", config.Scopes);
+        Assert.Contains("playlist-read-private", config.Scopes);
+        Assert.Contains("playlist-read-collaborative", config.Scopes);
+        Assert.DoesNotContain("client_secret", config.Scopes, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void PkceHelper_GeneratesValidVerifierAndChallenge()
     {
         string verifier = PkceHelper.GenerateCodeVerifier(64);
@@ -266,5 +279,48 @@ public class SpotifyAuthAndApiTests
         Assert.False(authService.IsConnected);
         Assert.False(tokenStore.HasTokens());
         Assert.True(eventRaised);
+    }
+
+    [Fact]
+    public async Task SpotifyAuthService_TransientRefreshFailureKeepsEncryptedCredentialsForRetry()
+    {
+        var store = new MockTokenStore();
+        store.SaveTokens(new SpotifyTokenData
+        {
+            AccessToken = "expired_access_token",
+            RefreshToken = "refresh_credential",
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-5)
+        });
+        using var client = new HttpClient(new MockHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)));
+        using var auth = new SpotifyAuthService(new SpotifyConfig(), store, client);
+
+        var token = await auth.GetValidAccessTokenAsync();
+
+        Assert.Null(token);
+        Assert.True(auth.IsConnected);
+        Assert.True(store.HasTokens());
+    }
+
+    [Fact]
+    public async Task SpotifyAuthService_RevokedRefreshCredentialDisconnectsAndClearsStore()
+    {
+        var store = new MockTokenStore();
+        store.SaveTokens(new SpotifyTokenData
+        {
+            AccessToken = "expired_access_token",
+            RefreshToken = "revoked_refresh_credential",
+            ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-5)
+        });
+        using var client = new HttpClient(new MockHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.BadRequest)));
+        using var auth = new SpotifyAuthService(new SpotifyConfig(), store, client);
+        bool disconnected = false;
+        auth.ConnectionStatusChanged += (_, connected) => disconnected = !connected;
+
+        var token = await auth.GetValidAccessTokenAsync();
+
+        Assert.Null(token);
+        Assert.False(auth.IsConnected);
+        Assert.False(store.HasTokens());
+        Assert.True(disconnected);
     }
 }

@@ -11,9 +11,13 @@ namespace Spotifly.App.Services;
 public interface ISpotifyAuthService : IDisposable
 {
     bool IsConnected { get; }
+    bool IsAuthenticating => false;
+    string RedirectUri => string.Empty;
     event EventHandler<bool>? ConnectionStatusChanged;
+    event EventHandler<bool>? AuthenticationStateChanged { add { } remove { } }
     Task<bool> AuthenticateAsync(CancellationToken cancellationToken = default);
     Task<string?> GetValidAccessTokenAsync(CancellationToken cancellationToken = default);
+    Task<string?> RefreshAccessTokenAsync(CancellationToken cancellationToken = default) => GetValidAccessTokenAsync(cancellationToken);
     Task DisconnectAsync();
 }
 
@@ -35,7 +39,10 @@ public sealed class SpotifyAuthService : ISpotifyAuthService, IDisposable
     private bool _disposed;
 
     public bool IsConnected => _currentToken != null && !string.IsNullOrEmpty(_currentToken.AccessToken);
+    public bool IsAuthenticating { get; private set; }
+    public string RedirectUri => _config.RedirectUri;
     public event EventHandler<bool>? ConnectionStatusChanged;
+    public event EventHandler<bool>? AuthenticationStateChanged;
 
     public SpotifyAuthService(
         SpotifyConfig config,
@@ -51,9 +58,27 @@ public sealed class SpotifyAuthService : ISpotifyAuthService, IDisposable
 
         // Attempt to load existing credentials
         _currentToken = _tokenStore.LoadTokens();
+        _logger?.LogInformation(_currentToken == null
+            ? "Spotify authentication state: no stored credentials; connection required."
+            : "Spotify authentication state: encrypted credentials loaded.");
     }
 
     public async Task<bool> AuthenticateAsync(CancellationToken cancellationToken = default)
+    {
+        IsAuthenticating = true;
+        try
+        {
+            AuthenticationStateChanged?.Invoke(this, true);
+            return await AuthenticateCoreAsync(cancellationToken);
+        }
+        finally
+        {
+            IsAuthenticating = false;
+            AuthenticationStateChanged?.Invoke(this, false);
+        }
+    }
+
+    private async Task<bool> AuthenticateCoreAsync(CancellationToken cancellationToken)
     {
         _logger?.LogInformation("Starting Spotify OAuth PKCE authorization flow.");
 
@@ -72,7 +97,7 @@ public sealed class SpotifyAuthService : ISpotifyAuthService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger?.LogError($"Failed to start local HttpListener on {prefix}. Port may be occupied.", ex);
+            _logger?.LogError($"Failed to start local OAuth callback listener on port {_config.LoopbackPort}.", ex);
             throw new InvalidOperationException($"Could not open local listener on port {_config.LoopbackPort}. Ensure port is available.", ex);
         }
 
@@ -87,6 +112,7 @@ public sealed class SpotifyAuthService : ISpotifyAuthService, IDisposable
             query["code_challenge"] = codeChallenge;
             query["state"] = state;
             query["scope"] = _config.Scopes;
+            query["show_dialog"] = "true";
 
             string authUrl = $"{_config.AuthorizeEndpoint}?{query}";
 
@@ -118,44 +144,31 @@ public sealed class SpotifyAuthService : ISpotifyAuthService, IDisposable
             var error = request.QueryString["error"];
 
             // Send polite user-facing HTML response
-            string responseString;
             if (!string.IsNullOrEmpty(error))
             {
-                responseString = "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#121212;color:#ff6b6b;'>" +
-                                 "<h2>Authentication Denied or Failed</h2><p>You can close this window and return to Spotifly.</p></body></html>";
-            }
-            else
-            {
-                responseString = "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#121212;color:#1ed760;'>" +
-                                 "<h2>Spotifly Connected Successfully!</h2><p>You can close this tab and return to the Spotifly Dynamic Island.</p></body></html>";
-            }
-
-            var buffer = Encoding.UTF8.GetBytes(responseString);
-            response.ContentLength64 = buffer.Length;
-            response.ContentType = "text/html";
-            await response.OutputStream.WriteAsync(buffer, 0, buffer.Length, cancellationToken);
-            response.OutputStream.Close();
-
-            if (!string.IsNullOrEmpty(error))
-            {
-                _logger?.LogWarning($"Spotify authorization returned error: {error}");
+                await WriteCallbackPageAsync(response, success: false, cancellationToken);
+                _logger?.LogWarning("Spotify authorization was denied or returned an OAuth error.");
                 return false;
             }
 
             if (returnedState != state)
             {
+                await WriteCallbackPageAsync(response, success: false, cancellationToken);
                 _logger?.LogError("State mismatch detected during OAuth callback. Possible CSRF attack.");
                 throw new InvalidOperationException("OAuth state validation failed. Request was rejected for security.");
             }
 
             if (string.IsNullOrEmpty(code))
             {
+                await WriteCallbackPageAsync(response, success: false, cancellationToken);
                 _logger?.LogWarning("No authorization code received in Spotify callback.");
                 return false;
             }
 
             // Exchange Authorization Code + Verifier for Tokens
-            return await ExchangeCodeForTokenAsync(code, codeVerifier, cancellationToken);
+            var authenticated = await ExchangeCodeForTokenAsync(code, codeVerifier, cancellationToken);
+            await WriteCallbackPageAsync(response, authenticated, cancellationToken);
+            return authenticated;
         }
         finally
         {
@@ -190,7 +203,7 @@ public sealed class SpotifyAuthService : ISpotifyAuthService, IDisposable
 
         if (!response.IsSuccessStatusCode)
         {
-            _logger?.LogError($"Token exchange failed with HTTP {(int)response.StatusCode}. Response: {json}");
+            _logger?.LogError($"Token exchange failed with HTTP {(int)response.StatusCode}.");
             return false;
         }
 
@@ -245,6 +258,29 @@ public sealed class SpotifyAuthService : ISpotifyAuthService, IDisposable
         }
     }
 
+    public async Task<string?> RefreshAccessTokenAsync(CancellationToken cancellationToken = default)
+    {
+        await _tokenLock.WaitAsync(cancellationToken);
+        try
+        {
+            _currentToken ??= _tokenStore.LoadTokens();
+            if (_currentToken == null || string.IsNullOrEmpty(_currentToken.RefreshToken))
+            {
+                _logger?.LogWarning("Cannot refresh Spotify authorization because no refresh credential is available.");
+                await DisconnectInternalAsync();
+                return null;
+            }
+
+            return await RefreshAccessTokenAsync(_currentToken.RefreshToken, cancellationToken)
+                ? _currentToken?.AccessToken
+                : null;
+        }
+        finally
+        {
+            _tokenLock.Release();
+        }
+    }
+
     private async Task<bool> RefreshAccessTokenAsync(string refreshToken, CancellationToken cancellationToken)
     {
         _logger?.LogInformation("Refreshing Spotify access token using refresh token.");
@@ -266,8 +302,11 @@ public sealed class SpotifyAuthService : ISpotifyAuthService, IDisposable
 
         if (!response.IsSuccessStatusCode)
         {
-            _logger?.LogWarning($"Token refresh failed with HTTP {(int)response.StatusCode}. Refresh token may be revoked. Disconnecting.");
-            await DisconnectInternalAsync();
+            _logger?.LogWarning($"Spotify token refresh failed with HTTP {(int)response.StatusCode}.");
+            if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized)
+            {
+                await DisconnectInternalAsync();
+            }
             return false;
         }
 
@@ -292,10 +331,22 @@ public sealed class SpotifyAuthService : ISpotifyAuthService, IDisposable
 
     private async Task SetTokenDataAsync(SpotifyTokenData tokenData)
     {
-        _currentToken = tokenData;
         _tokenStore.SaveTokens(tokenData);
+        _currentToken = tokenData;
         ConnectionStatusChanged?.Invoke(this, true);
         await Task.CompletedTask;
+    }
+
+    private static async Task WriteCallbackPageAsync(HttpListenerResponse response, bool success, CancellationToken cancellationToken)
+    {
+        string responseString = success
+            ? "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#121212;color:#1ed760;'><h2>Spotifly Connected Successfully!</h2><p>You can close this tab and return to Spotifly.</p></body></html>"
+            : "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#121212;color:#ff6b6b;'><h2>Authentication Failed</h2><p>Return to Spotifly and try connecting again.</p></body></html>";
+        var buffer = Encoding.UTF8.GetBytes(responseString);
+        response.ContentLength64 = buffer.Length;
+        response.ContentType = "text/html; charset=utf-8";
+        await response.OutputStream.WriteAsync(buffer, cancellationToken);
+        response.Close();
     }
 
     public async Task DisconnectAsync()

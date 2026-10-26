@@ -20,6 +20,12 @@ public sealed class SpotifyPlaybackResponse
     public SpotifyItem? Item { get; set; }
 }
 
+public sealed class SpotifyDevicesResponse
+{
+    [JsonPropertyName("devices")]
+    public List<SpotifyDevice>? Devices { get; set; }
+}
+
 public sealed class SpotifyDevice
 {
     [JsonPropertyName("id")]
