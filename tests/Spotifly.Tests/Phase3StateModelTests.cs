@@ -14,7 +14,7 @@ public class Phase3StateModelTests
     public void OverlayDimensions_IncludesPhase3TimingsAndExpandedBounds()
     {
         var dims = new OverlayDimensions();
-        Assert.Equal(110.0, dims.CompactWidth);
+        Assert.Equal(75.0, dims.CompactWidth);
         Assert.Equal(38.0, dims.CompactHeight);
         Assert.Equal(360.0, dims.ExpandedWidth);
         Assert.Equal(200.0, dims.ExpandedHeight);
