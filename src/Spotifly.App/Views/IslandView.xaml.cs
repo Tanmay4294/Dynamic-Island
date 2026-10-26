@@ -254,13 +254,10 @@ public partial class IslandView : Window
                     return new IntPtr(HTTRANSPARENT);
                 }
 
-                var hitResult = VisualTreeHelper.HitTest(this, pointInWindow);
-                if (hitResult == null || hitResult.VisualHit == RootLayout)
-                {
-                    handled = true;
-                    return new IntPtr(HTTRANSPARENT);
-                }
-
+                // Return HTCLIENT for every point inside the island geometry. WPF then
+                // performs the normal visual hit test and routes the click to buttons.
+                // A second VisualTreeHelper hit test here incorrectly rejected button
+                // template visuals on transparent windows on some Windows builds.
                 handled = true;
                 return new IntPtr(HTCLIENT);
             }
@@ -750,6 +747,8 @@ public partial class IslandView : Window
 
     private void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
+        _logger?.LogInformation("Settings gear clicked; opening Settings window.");
+        e.Handled = true;
         _isInteracting = true;
         _hideTimer.Stop();
 
@@ -782,12 +781,25 @@ public partial class IslandView : Window
                         StartHideDelayIfNeeded();
                     };
                     _activeSettingsWindow.Show();
+                    _activeSettingsWindow.Activate();
+                    _activeSettingsWindow.Focus();
+                    _logger?.LogInformation("Settings window created and activated.");
                     TransitionToState(IslandState.SettingsOpen);
+                }
+                else
+                {
+                    _logger?.LogWarning("Settings gear click received, but required Settings services are unavailable.");
                 }
             }
             else
             {
+                if (_activeSettingsWindow.WindowState == WindowState.Minimized)
+                {
+                    _activeSettingsWindow.WindowState = WindowState.Normal;
+                }
                 _activeSettingsWindow.Activate();
+                _activeSettingsWindow.Focus();
+                _logger?.LogInformation("Existing Settings window activated.");
             }
         }
         catch (Exception ex)
