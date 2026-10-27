@@ -436,7 +436,7 @@
                                               PreviewMouseWheel="PlaylistCarousel_PreviewMouseWheel">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
-                                            <controls:FanCarouselPanel CardWidth="126" CardHeight="108" />
+                                            <controls:FanCarouselPanel CardWidth="136" CardHeight="114" />
                                         </ItemsPanelTemplate>
                                     </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
@@ -447,14 +447,14 @@
                                                         MouseLeftButtonUp="PlaylistItem_MouseLeftButtonUp">
                                                     <Grid>
                                                         <Grid.RowDefinitions>
-                                                            <RowDefinition Height="64" />
+                                                            <RowDefinition Height="74" />
                                                             <RowDefinition Height="*" />
                                                         </Grid.RowDefinitions>
 
                                                         <!-- Playlist Cover Thumbnail -->
                                                         <Border Grid.Row="0"
-                                                                Width="58" Height="58"
-                                                                CornerRadius="6"
+                                                                Width="68" Height="68"
+                                                                CornerRadius="10"
                                                                 ClipToBounds="True"
                                                                 Background="#282828"
                                                                 HorizontalAlignment="Center"
