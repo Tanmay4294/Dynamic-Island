@@ -254,11 +254,11 @@
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Top"
                                         Margin="0,-38,0,0"
-                                        CornerRadius="10"
+                                        CornerRadius="14"
                                         ClipToBounds="True"
-                                        Background="#262626"
-                                        BorderBrush="#33FFFFFF"
-                                        BorderThickness="1"
+                                        Background="Transparent"
+                                        BorderBrush="Transparent"
+                                        BorderThickness="0"
                                         Cursor="Hand"
                                         ToolTip="Open in Spotify"
                                         MouseLeftButtonUp="Artwork_MouseLeftButtonUp">
@@ -454,9 +454,9 @@
                                                         <!-- Playlist Cover Thumbnail -->
                                                         <Border Grid.Row="0"
                                                                 Width="68" Height="68"
-                                                                CornerRadius="10"
+                                                                CornerRadius="14"
                                                                 ClipToBounds="True"
-                                                                Background="#282828"
+                                                                Background="Transparent"
                                                                 HorizontalAlignment="Center"
                                                                 VerticalAlignment="Center">
                                                             <Grid>
