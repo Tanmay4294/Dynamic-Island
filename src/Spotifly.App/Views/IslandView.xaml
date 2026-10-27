@@ -42,6 +42,7 @@
                                                 ProgressBrush="{DynamicResource ProgressArcForegroundBrush}"
                                                 GlowBrush="{DynamicResource ProgressArcGlowBrush}"
                                                 IsCompact="True"
+                                                Panel.ZIndex="10"
                                                 IsHitTestVisible="False" />
 
             <!-- Island Inner Content Container clipped to the exact Vector Geometry -->
@@ -457,7 +458,7 @@
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
                                                             <!-- Cover Thumbnail -->
-                                                            <ColumnDefinition Width="34" />
+                                                            <ColumnDefinition Width="54" />
                                                             <!-- Name and Track Count -->
                                                             <ColumnDefinition Width="*" />
                                                             <!-- Open in Spotify Icon -->
@@ -466,8 +467,8 @@
 
                                                         <!-- Playlist Cover Thumbnail -->
                                                         <Border Grid.Column="0"
-                                                                Width="30" Height="30"
-                                                                CornerRadius="4"
+                                                                Width="48" Height="48"
+                                                                CornerRadius="6"
                                                                 ClipToBounds="True"
                                                                 Background="#282828">
                                                             <Grid>
@@ -477,9 +478,9 @@
                                                                       VerticalAlignment="Center"
                                                                       Stretch="Uniform"
                                                                       Data="M15,6H3V8H15V6M15,10H3V12H15V10M3,16H11V14H3V16M17,6V14.18C16.69,14.07 16.35,14 16,14A3,3 0 0,0 13,17A3,3 0 0,0 16,20A3,3 0 0,0 19,17V8H22V6H17Z" />
-                                                                <Image Source="{Binding CoverImageUrl}"
-                                                                       Stretch="UniformToFill"
-                                                                       RenderOptions.BitmapScalingMode="HighQuality" />
+                                                                <controls:RemoteArtworkImage SourceUrl="{Binding CoverImageUrl}"
+                                                                                             Stretch="UniformToFill"
+                                                                                             RenderOptions.BitmapScalingMode="HighQuality" />
                                                             </Grid>
                                                         </Border>
 
