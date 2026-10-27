@@ -144,6 +144,8 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="8" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
                     <!-- Minimal Card -->
@@ -226,8 +228,51 @@
                         </RadioButton.Template>
                     </RadioButton>
 
-                    <!-- Glassmorphism Card -->
+                    <!-- Album Cover Card -->
                     <RadioButton Grid.Column="4"
+                                 GroupName="ThemeGroup"
+                                 IsChecked="{Binding IsAlbumCoverSelected, Mode=TwoWay}"
+                                 Cursor="Hand">
+                        <RadioButton.Template>
+                            <ControlTemplate TargetType="RadioButton">
+                                <Border x:Name="CardBorder"
+                                        Background="#171313"
+                                        BorderBrush="#A0332020"
+                                        BorderThickness="1.5"
+                                        CornerRadius="10"
+                                        Padding="8,10">
+                                    <StackPanel HorizontalAlignment="Center">
+                                        <Border Width="65" Height="22"
+                                                BorderBrush="#E0523028"
+                                                BorderThickness="1"
+                                                CornerRadius="0,0,11,11"
+                                                Margin="0,0,0,8">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                    <GradientStop Color="#B944201E" Offset="0" />
+                                                    <GradientStop Color="#B0893A28" Offset="1" />
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+                                        <TextBlock Text="Album Cover"
+                                                   FontSize="12"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="#FFFFFF"
+                                                   HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsChecked" Value="True">
+                                        <Setter TargetName="CardBorder" Property="BorderBrush" Value="{DynamicResource IslandAccentBrush}" />
+                                        <Setter TargetName="CardBorder" Property="Background" Value="#221DB954" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </RadioButton.Template>
+                    </RadioButton>
+
+                    <!-- Glassmorphism Card -->
+                    <RadioButton Grid.Column="6"
                                  GroupName="ThemeGroup"
                                  IsChecked="{Binding IsGlassmorphismSelected, Mode=TwoWay}"
                                  Cursor="Hand">

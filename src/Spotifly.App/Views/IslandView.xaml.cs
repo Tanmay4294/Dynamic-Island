@@ -138,6 +138,11 @@ public partial class IslandView : Window
             _settingsService.SettingsChanged += OnSettingsChanged;
         }
 
+        if (_themeService != null)
+        {
+            _themeService.ThemeChanged += OnThemeChanged;
+        }
+
         if (_progressService != null && _spotifyService == null)
         {
             IslandProgressArc.Progress = _progressService.Progress;
@@ -1093,13 +1098,22 @@ public partial class IslandView : Window
             await Dispatcher.InvokeAsync(() =>
             {
                 if (loadVersion == _artworkLoadVersion && _currentArtworkUrl == artworkUrl)
+                {
                     AlbumArtworkImage.Source = bitmap;
+                    _themeService?.ApplyArtworkPalette(AlbumArtworkPaletteExtractor.ExtractAccent(bitmap));
+                }
             });
         }
         catch (Exception ex)
         {
             _logger?.LogWarning("Spotify album artwork could not be loaded; showing placeholder.", ex);
         }
+    }
+
+    private void OnThemeChanged(object? sender, AppTheme theme)
+    {
+        if (theme == AppTheme.AlbumCover && AlbumArtworkImage.Source is System.Windows.Media.Imaging.BitmapSource artwork)
+            _themeService?.ApplyArtworkPalette(AlbumArtworkPaletteExtractor.ExtractAccent(artwork));
     }
 
     private async void PlayPauseButton_Click(object sender, RoutedEventArgs e)
@@ -1605,6 +1619,10 @@ public partial class IslandView : Window
             _playbackPollTimer.Stop();
             _progressAnimationTimer.Stop();
             SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+            if (_themeService != null)
+            {
+                _themeService.ThemeChanged -= OnThemeChanged;
+            }
             if (_authService != null)
             {
                 _authService.ConnectionStatusChanged -= OnSpotifyConnectionStatusChanged;

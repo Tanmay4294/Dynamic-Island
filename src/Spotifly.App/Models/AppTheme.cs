@@ -4,5 +4,6 @@ public enum AppTheme
 {
     Minimal,
     Modern,
-    Glassmorphism
+    Glassmorphism,
+    AlbumCover
 }

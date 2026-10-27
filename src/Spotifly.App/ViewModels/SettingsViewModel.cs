@@ -94,6 +94,7 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(IsMinimalSelected));
                 OnPropertyChanged(nameof(IsModernSelected));
                 OnPropertyChanged(nameof(IsGlassmorphismSelected));
+                OnPropertyChanged(nameof(IsAlbumCoverSelected));
 
                 _themeService.ApplyTheme(value);
                 _settingsService.UpdateSettings(s => s.Theme = value);
@@ -117,6 +118,12 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     {
         get => SelectedTheme == AppTheme.Glassmorphism;
         set { if (value) SelectedTheme = AppTheme.Glassmorphism; }
+    }
+
+    public bool IsAlbumCoverSelected
+    {
+        get => SelectedTheme == AppTheme.AlbumCover;
+        set { if (value) SelectedTheme = AppTheme.AlbumCover; }
     }
 
     private int _activationDelayMs;
