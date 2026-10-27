@@ -1,198 +1,131 @@
-# Spotifly (Dynamic-Island)
+# Dynamic Island for Spotify (Spotifly)
 
-Spotifly is a standalone Windows desktop application that displays a small, hover-activated semicircular "Dynamic Island" near the top-centre of the screen, providing Spotify controls and library browsing.
+Spotifly is a Windows desktop companion for Spotify. It places a borderless Dynamic Island at the top of the screen, expands on hover, and provides Now Playing information, playback controls, playlist browsing, album artwork, and a curved playback progress indicator. It controls Spotify through the Spotify Web API and never downloads or plays audio locally.
 
-## Architecture & Technology Stack
-- **Target Framework**: .NET 8.0 LTS (`net8.0-windows`)
-- **Presentation**: C# / WPF + Windows Desktop APIs
-- **Design Pattern**: MVVM (Model-View-ViewModel)
-- **Lifecycle & Execution**: Background service with single-instance named Mutex guard and explicit tray/settings exit
-- **Logging**: Rotating thread-safe structured file logging with automated credential/token scrubbing
-- **Tests**: xUnit test suite (`Spotifly.Tests`)
+## Features
 
-## Build & Run Commands
-Build the entire solution:
-```powershell
-dotnet build Spotifly.sln
+- Compact top-of-screen island with a persistent progress arc and hover expansion.
+- Now Playing artwork, title, artist, device status, live progress, play/pause, next, and previous controls.
+- Playlist carousel with real Spotify covers, names, looping fan navigation, and clickable selection.
+- Song carousel inside a selected playlist with artwork and playback actions.
+- Minimal, Modern, Glassmorphism, and Album Cover appearance modes.
+- Album Cover mode extracts a vivid color from artwork and applies it to the island accent, progress arc, halo, controls, and borders.
+- Settings window, system tray controls, startup launch, single-instance enforcement, and safe hide versus exit behavior.
+- DPAPI-protected tokens and sanitized rotating logs.
+
+## Technology
+
+- C# and WPF on .NET 8 (`net8.0-windows`)
+- Windows Forms integration for the notification-area tray icon
+- MVVM for Settings and preference editing, with code-behind for overlay animation and hit testing
+- Spotify OAuth Authorization Code with PKCE
+- xUnit tests in `tests/Spotifly.Tests`
+- No client secret is embedded in the desktop application
+
+## Project layout
+
+| Path | Responsibility |
+| --- | --- |
+| `src/Spotifly.App/App.xaml.cs` | Startup, dependency wiring, single-instance and shutdown lifecycle |
+| `src/Spotifly.App/Views/IslandView.xaml` | Island visual tree, controls, bindings, and carousel templates |
+| `src/Spotifly.App/Views/IslandView.xaml.cs` | Overlay states, hover behavior, transitions, playback UI, and navigation |
+| `src/Spotifly.App/Views/SettingsWindow.xaml` | Settings window and appearance cards |
+| `src/Spotifly.App/ViewModels/SettingsViewModel.cs` | Settings, themes, Spotify account actions, and startup preference |
+| `src/Spotifly.App/Controls/FanCarouselPanel.cs` | Responsive arc layout, rotation, scale, depth, and animated carousel offset |
+| `src/Spotifly.App/Controls/SemicircleProgressControl.cs` | Track arc, progress arc, and glow drawing |
+| `src/Spotifly.App/Controls/RemoteArtworkImage.cs` | Asynchronous playlist artwork loading and caching |
+| `src/Spotifly.App/Services/SpotifyAuthService.cs` | PKCE authorization, callback listener, refresh, and secure token persistence |
+| `src/Spotifly.App/Services/SpotifyApiService.cs` | Spotify HTTP API operations |
+| `src/Spotifly.App/Services/SpotifyService.cs` | Playback polling, playlists, tracks, device state, and commands |
+| `src/Spotifly.App/Services/IThemeService.cs` | Runtime theme switching and album palette application |
+| `src/Spotifly.App/Themes/*.xaml` | Minimal, Modern, Glassmorphism, Album Cover, and shared resources |
+| `src/Spotifly.App/Models` | Playback, playlist, track, settings, and state models |
+
+## How the Dynamic Island works
+
+`IslandView` is a transparent, topmost, borderless WPF window. `IslandBackgroundPath` draws the curved island geometry. `IslandContentContainer` clips content to the same geometry so artwork and controls stay inside the dome. The progress control is a click-through overlay rendered above content, keeping the arc visible without intercepting buttons.
+
+The state machine includes `Hidden`, `Compact`, `Expanded`, `Library`, `PlaylistTracks`, and `SettingsOpen`. Cursor polling and activation/hide timers manage transitions. Moving away from an expanded island collapses to `Compact`, keeping the island available. Explicit X dismissal uses `Hidden`; Settings Exit and tray Exit terminate the process.
+
+`FanCarouselPanel` measures cards against the available island size and arranges them around the center. Center cards are upright and larger; edge cards rotate, scale, and move along the fan. Its animated dependency-property offset provides smooth movement. Playlist and song panels use separate panel instances.
+
+`SemicircleProgressControl` draws the track arc and normalized progress arc. Live Spotify progress uses `progress_ms`, `duration_ms`, and the last snapshot timestamp while playing, then updates on a UI timer. The arc and Album Cover halo share the same palette.
+
+## Appearance modes
+
+- **Minimal**: neutral dark island with a clean white arc.
+- **Modern**: Spotify green accents and neon green glow.
+- **Glassmorphism**: translucent surfaces and soft ambient contrast.
+- **Album Cover**: samples saturated artwork pixels, selects a readable accent, and applies it to `IslandAccentBrush`, progress brushes, `IslandShadowEffect`, borders, hover states, and card tints. Green is used until artwork is available.
+
+Theme dictionaries are hot-swapped by `ThemeService`, so changing appearance does not recreate the island or interrupt playback.
+
+## Spotify authentication and API
+
+Register this exact redirect URI in the Spotify Developer Dashboard:
+
+```text
+http://127.0.0.1:43821/callback
 ```
 
-Run test suite:
-```powershell
-dotnet test Spotifly.sln
+The PKCE flow creates a high-entropy verifier, opens the default browser, receives the loopback callback, exchanges the code without a client secret, encrypts access and refresh tokens with Windows DPAPI, and starts playback polling. Requested scopes cover profile information, playback state and controls, private playlists, and collaborative playlists. Reconnect after changing scopes.
+
+Playback control requires an active Spotify device and generally a Premium account. Spotifly sends remote-control commands and does not stream audio locally. HTTP 401, 403, 429, no-device, idle, paused, and network failure states are mapped to user-facing status text with sanitized diagnostics.
+
+## Settings, startup, and storage
+
+Open Settings with the island gear, expanded header gear, or tray menu. Preferences are stored at `%LocalAppData%\\Spotifly\\settings.json`; secure tokens are stored separately in DPAPI-protected storage. The startup toggle uses `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run` without administrator access.
+
+The updater creates the canonical Start-menu entry **Dynamic Island**, targeting:
+
+```text
+%LocalAppData%\\Programs\\Spotifly\\Spotifly.App.exe
 ```
 
-Run the application:
+User settings and tokens remain in place during updates. Logs are written to `%LocalAppData%\\Spotifly\\Logs\\spotifly.log` with rotation and redaction of bearer values, tokens, authorization codes, and sensitive parameters.
+
+## Build, test, run, and update
+
+From `C:\\dynamic_island`:
+
 ```powershell
-dotnet run --project src/Spotifly.App
+$env:DOTNET_ROOT = 'C:\\Users\\Tanmay\\AppData\\Local\\Microsoft\\dotnet'
+$env:PATH = "$env:DOTNET_ROOT;$env:PATH"
+
+dotnet restore Spotifly.sln
+dotnet build Spotifly.sln -c Release
+dotnet test Spotifly.sln -c Release --no-build
+dotnet run --project src/Spotifly.App -c Release
 ```
 
-## Implementation Phases
-- [x] **Phase 0**: Repository and Environment Audit (Resolved .NET 8 LTS SDK environment and repository setup)
-- [x] **Phase 1**: Minimal WPF Shell and Single-Instance Behaviour
-- [x] **Phase 2**: Transparent Overlay Window and Semicircle Shape
-- [x] **Phase 3**: Hover Trigger, Compact Menu and Expanded/Collapsed States
-- [x] **Phase 4**: Theme System and Settings Window
-- [x] **Phase 5**: Curved Semicircular Progress Control (Simulated Data First)
-- [x] **Phase 6**: Spotify Authentication and API Connectivity Test
-- [x] **Phase 7**: Spotify Service: Now Playing, Playback and Album Art
-- [x] **Phase 8**: Spotify Playlist List with Cover Art
-- [x] **Phase 9**: Playlist Song List with Album Art
-- [x] **Phase 10**: Click a Song to Play It
+Update the permanent installation with:
 
-## Phase 10: Song Playback & UX Behavior
-- **Trigger**: Deliberate click on any track in the expanded playlist song list.
-- **Player API**: Sends `PUT https://api.spotify.com/v1/me/player/play` with the track's Spotify URI and parent playlist context URI. Never streams or downloads audio within Spotifly.
-- **Duplicate Prevention**: Immediate visual pending state on the clicked track row, temporary interaction lock, and automatic UI state restoration upon completion, error, or cancellation.
-- **Error & Edge Case Handling**:
-  - `401 Unauthorized`: Silent token refresh and one automatic retry; prompts reconnection if refresh fails.
-  - `403 Forbidden`: Displays clear notification indicating Premium requirement or permission restriction.
-  - `404 Not Found` / No Active Device: Notifies user to launch or activate playback on a Spotify device.
-  - `429 Too Many Requests`: Honors `Retry-After` header and prevents spamming.
-- **UX Decision (Playlist View Retention)**: Spotifly deliberately keeps the user in the playlist song list upon starting playback rather than auto-switching back to Now Playing. This allows users to browse, explore, and queue subsequent tracks uninterrupted.
-- **Prerequisites for Manual Verification**: An active Spotify Premium subscription and an active Spotify player device (e.g., Spotify desktop or mobile app running with an active session).
-- [x] **Phase 11**: Mouse-Wheel Mode Switching and Navigation Polish
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\\scripts\\Update-Spotifly.ps1
+```
 
-## Phase 11: Mouse-Wheel Navigation & List Isolation
-- **Top-Level Navigation**:
-  - While viewing expanded **Now Playing**, scrolling up (`delta > 0`) switches to the **Playlists Library**.
-  - While viewing the **Playlists Library**, scrolling down (`delta < 0`) switches back to **Now Playing**.
-  - Direction mapping and debouncing/throttling (350ms window) prevent rapid touchpad gesture bursts from jittering or toggling views repeatedly.
-- **List Scroll Isolation**:
-  - Scrolling inside the playlist list (`PlaylistsScrollViewer`) or track list (`TracksScrollViewer`) handles scrolling directly on the list and stops event propagation (`e.Handled = true`), preventing accidental view flips.
-  - Normal list scrolling is never throttled or debounced.
-- **Navigation Controls & Polish**:
-  - Retained the song list **Back** button to return to Playlists with scroll position preserved.
-  - Preserved the compact middle **Spotifly** control to reliably open the expanded Now Playing view without altering compact menu structure.
-  - Added subtle, theme-aligned visual hint badge (`NavigationHintBadge`) indicating the current view and available wheel direction without cluttering the island.
-  - Ensured no autoplay occurs upon hover, focus, or selection.
-- [x] **Phase 12**: Windows Startup, Settings Persistence and Recovery
+The script publishes Release output, updates `%LocalAppData%\\Programs\\Spotifly`, refreshes the Dynamic Island shortcuts and startup registration, and preserves user data.
 
-## Phase 12: Startup, Recovery & Lifecycle Hardening
-- **Windows Startup**:
-  - Unpackaged, non-elevated per-user registration via `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
-  - Idempotent configuration: repeated enable/disable calls never produce duplicate registry values or launch loops.
-  - Windows startup toggle in Settings actively queries and mirrors the underlying Windows registry configuration.
-- **Settings Persistence & Resilient Recovery**:
-  - Stores all preferences (`theme`, `activationDelayMs`, `hideDelayMs`, `horizontalOffset`, `verticalOffset`, `launchAtSignIn`) in `%LocalAppData%\Spotifly\settings.json`.
-  - Writes updates atomically via `.tmp` swap to prevent partial writes during sudden power-off.
-  - Validates and clamps all numeric ranges upon load; if JSON is malformed or corrupted, logs the issue, restores safe defaults without crashing, and saves a repaired file.
-- **Offline & Disconnected State**:
-  - Spotifly UI, controls, animations, and settings operate gracefully offline without Spotify connection.
-  - When disconnected or without internet, displays non-blocking status messages ("Spotify is idle", "Spotify not connected", "Network connection to Spotify failed"). Never crashes or hangs UI threads.
-- **Single-Instance & Clean Exit**:
-  - Protected by named system `Mutex` and `EventWaitHandle`; duplicate launches signal the existing instance to pop up a friendly tray balloon notification, then immediately terminate cleanly.
-  - Explicit **Exit** actions in Settings and system tray execute full cooperative shutdown: cancels background tokens, flushes settings, closes overlay, and disposes mutex and HTTP clients cleanly.
-  - The compact **X** button continues to dismiss/hide the island as designed and does not terminate the app.
-- [x] **Phase 13**: Testing, Accessibility, Performance and Security
+For a self-contained package:
 
-## Phase 13: Quality, Security, Accessibility & Performance
-- **Automated Test Matrix (95 Unit Tests across net8.0)**:
-  - First-launch disconnected state, authorized/cancelled/revoked token handling.
-  - Inactive/no device states, HTTP 401, 403, 429 (`Retry-After`), and 5xx server resilience.
-  - Playlist pagination, missing cover artwork, episodes, and null item filtering without crashes.
-  - Multi-DPI resolution scaling, top-level wheel direction, touchpad debouncing, and list scroll isolation.
-  - Settings corruption recovery, atomic file swaps, Windows startup idempotency, and named mutex single-instance enforcement.
-- **Security & Privacy**:
-  - Zero hardcoded client secrets or tokens in source code or output binaries.
-  - OAuth 2.0 PKCE flow with high-entropy verifier and DPAPI Windows-protected local token storage.
-  - Automatic structured log scrubbing with compiled regular expressions redacting Bearer tokens, authorization codes, and sensitive parameters.
-  - Clean `.gitignore` strictly omitting user credentials, settings files, caches, and build outputs.
-  - Zero telemetry, analytics, third-party network trackers, or dynamic remote script execution.
-- **Accessibility & Usability**:
-  - Full keyboard focusability with high-contrast dashed visual focus rectangles (`IslandCircleButtonStyle`).
-  - Added programmatic `AutomationProperties.Name` across all interactive buttons for screen readers.
-  - Meaningful tooltips on all icon-only buttons (`Settings`, `Spotifly Home`, `Dismiss`, `Play/Pause`, `Next`, `Previous`, `Refresh`, `Back`).
-  - Information architecture avoids communicating state purely through color (distinct icons, chevrons, and descriptive text badges).
-- **Performance & Lifecycle Optimization**:
-  - Artwork decoding explicitly constrained with `DecodePixelWidth = 124` (2x native 62 DIP container) and `.Freeze()` for fast GPU blitting without memory bloat.
-  - Avoids re-decoding bitmaps on unchanged tracks across playback poll intervals.
-  - Bounded HTTP timeouts (10–15s) and `CancellationToken` support throughout all background tasks.
-  - Non-polling cursor tracking and playback polling paused entirely when island is hidden.
-- [x] **Phase 14**: Packaging and Final Handoff
-
-## Phase 14: Packaging, Production Deployment & Handoff Guide
-
-### 1. Target Environment & Runtime Requirements
-- **OS**: Windows 10 (version 1809+ / Build 17763+) or Windows 11 (x64)
-- **Runtime**:
-  - **Framework-Dependent**: Requires [.NET 8.0 Windows Desktop Runtime (`windowsdesktop-runtime-8.0-win-x64`)](https://dotnet.microsoft.com/download/dotnet/8.0).
-  - **Self-Contained (Recommended)**: Includes all necessary .NET 8 runtime and WPF binaries embedded in the output package; no prior .NET installation is required on the user's laptop.
-
-### 2. Publish Commands
-From the repository root (`C:\dynamic_island`), publish using either method:
-
-#### A. Self-Contained Release (Zero Prerequisites on Target Machine)
 ```powershell
 dotnet publish src/Spotifly.App/Spotifly.App.csproj -c Release -r win-x64 --self-contained true -o publish/self-contained
 ```
-- Output executable: `publish/self-contained/Spotifly.App.exe`
 
-#### B. Framework-Dependent Release (Lightweight)
-```powershell
-dotnet publish src/Spotifly.App/Spotifly.App.csproj -c Release -o publish/framework-dependent
-```
-- Output executable: `publish/framework-dependent/Spotifly.App.exe`
+## Testing checklist
 
-### 3. Launching & Updating Spotifly
-- **Launch**: Double-click `Spotifly.App.exe`. Spotifly runs quietly in the background and places a Spotify-themed icon in the Windows Notification Area (system tray).
-- **Update**: Rebuild or publish the solution, then replace the files in your installation folder. Spotifly user settings (`%LocalAppData%\Spotifly\settings.json`) and secure tokens remain persisted and untouched across updates.
+Automated tests cover PKCE and token handling, playback response mapping, progress normalization, playlist pagination, missing artwork, carousel arrangement, navigation, settings recovery, startup registration, and single-instance behavior.
 
-### 4. Spotify Developer Configuration & Authorization
-1. Open the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and select your application: `Spotifly Windows dynamic island`.
-2. Go to **Settings** (`Basic Information` / `Redirect URIs`).
-3. Add the exact loopback redirect URI:
-   ```text
-   http://127.0.0.1:43821/callback
-   ```
-   *(Note: Spotify requires explicit `127.0.0.1`; `localhost` is strictly disallowed by Spotify).*
-4. In **User Management** (while in Development Mode):
-   - Add your Spotify account email to the **Users Allowlist**.
-   - Development Mode allows up to 5 authorized users, and the app creator must have an active Spotify Premium account.
-5. In Spotifly Settings, click **Connect Spotify** (or **Reconnect**). Your default browser will open to Spotify's authorization page. Click **Agree**; Spotify will redirect to the local loopback server, exchange the PKCE code for tokens with playback and playlist scopes (`user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative`), encrypt them via Windows DPAPI, and immediately verify connectivity.
-6. To **Disconnect**, open Settings and click **Disconnect Spotify**. All cached access and refresh tokens are wiped securely from Windows DPAPI storage.
+Manual checks should cover:
 
-### 5. Settings, Themes, and Windows Startup
-- **Accessing Settings**: Click the **Gear** icon in the compact island view, or click **Settings** in the expanded header, or right-click the system tray icon and select **Settings**.
-- **Switching Themes**: Select between **Minimal**, **Modern**, and **Glassmorphism**. Changes apply instantly at runtime across all open views without restarting.
-- **Controlling Windows Startup**: Toggle **Launch at Windows Sign-in** in Settings. This idempotently configures `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` without requiring administrator privileges or elevation.
-- **Dismissing vs Exiting**:
-  - Clicking the **X** button on the compact island **dismisses/hides** the island; the app remains running in the background.
-  - Clicking **Exit** in Settings or right-clicking the tray icon and selecting **Exit** performs a full, cooperative shutdown, releasing the single-instance mutex.
+1. Connect and disconnect Spotify through Settings.
+2. Start playback on an active device and confirm artwork, title, controls, and progress.
+3. Pause, resume, skip, and change tracks.
+4. Open playlists, scroll the fan carousel, select a playlist, and play a song.
+5. Select each appearance mode, including Album Cover with different artwork colors.
+6. Hover in and out repeatedly and open Settings from the gear.
+7. Restart Windows and confirm the installed Dynamic Island entry launches the current build.
 
-### 6. Spotify Policy & API Limitations
-- **Verification Notice**: Spotify Web API documentation, OAuth 2.0 PKCE tutorials, and Developer Terms of Service were last verified in **October 2026**.
-- **No Internal Audio Playback**: Spotifly acts as a remote controller and companion overlay; it does not download, decrypt, or stream raw audio streams locally.
-- **Active Player Requirement**: Spotify's Web Player API requires an active Spotify player device (desktop, web, or mobile app). If no device is active, Spotifly prompts the user to launch Spotify on a player device.
-- **Premium Requirement**: Track playback control via `/v1/me/player/play` requires an active Spotify Premium subscription.
-- **Simulated Progress Arc**: Semicircular progress arc operates in simulated mode to strictly comply with developer terms regarding audio visualizations and synchronization.
+## Privacy and Spotify notice
 
-### 7. Remaining Manual Verification Matrix
-Automated test coverage comprises 95 unit tests (`dotnet test -c Release Spotifly.sln`). The following checks require manual verification on the target laptop with a physical display and active Spotify account:
-1. **Physical Hover Activation**: Move mouse pointer into top 6 DIP activation zone to trigger compact dome emergence.
-2. **Real Spotify Authorization**: Complete OAuth PKCE flow in a live browser, verifying browser auto-redirect to loopback port `43821`.
-3. **Hardware Precision Touchpad**: Test two-finger vertical scrolling over Now Playing to confirm smooth, throttled switching to Library.
-4. **Multi-Monitor DPI Setup**: Drag or place overlay across secondary displays with 125%/150% scaling to observe geometry sharpness.
-
-## Spotify Developer Dashboard Configuration (Phase 6)
-To enable real Spotify authentication with Spotifly:
-1. Open the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and select your application: `Spotifly Windows dynamic island`.
-2. Go to **Settings** (`Basic Information` / `Redirect URIs`).
-3. Add the exact loopback redirect URI:
-   ```text
-   http://127.0.0.1:43821/callback
-   ```
-   *(Note: Spotify requires explicit `127.0.0.1`; `localhost` is strictly disallowed by Spotify).*
-4. In **User Management** (while in Development Mode):
-   - Add your Spotify account email to the **Users Allowlist**.
-   - Development Mode allows up to 5 authorized users, and the app creator must have an active Spotify Premium account.
-5. Save the changes in the dashboard.
-6. In Spotifly Settings, click **Connect Spotify** (or **Reconnect**). Your default browser will open to Spotify's authorization page. Click **Agree**; Spotify will redirect to the local loopback server, exchange the PKCE code for tokens with playback and playlist scopes (`user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative`), encrypt them via Windows DPAPI, and immediately verify connectivity.
-
-
-> [!IMPORTANT]
-> **Mandatory Policy Checkpoint before Phase 7 / Live Playback Binding**:
-> 1. In accordance with the **Spotify Developer Policy** and Spotify Developer Terms of Service, developers must strictly adhere to commercial and content display guidelines.
-> 2. Specific attention must be paid to restrictions against synchronizing sound recordings or Spotify content with external visual media, creating audio visualizations without explicit authorization, or modifying/deriving visual representations of Spotify-streamed audio.
-> 3. Until real-time playback position synchronization is thoroughly verified and vetted against current Spotify Developer terms, the progress arc remains decoupled from live Spotify position polling and seeking, operating in simulated mode.
-> 4. If developer authorization or policy compliance is unclear prior to Phase 7, the issue must be explicitly flagged for user review and confirmed before connecting live playback position APIs.
-
+Spotifly has no telemetry, analytics, third-party trackers, or remote script execution. Do not commit credentials, tokens, settings, logs, or build output. Spotify names, logos, artwork, and API services remain the property of Spotify and their respective owners. Use of the Spotify Web API must follow the current Spotify Developer Terms and policies.
