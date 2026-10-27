@@ -101,6 +101,16 @@ public sealed class ThemeService : IThemeService
             resources["ProgressArcTrackBrush"] = Brush(accent, 44);
             resources["ProgressArcForegroundBrush"] = Brush(accent);
             resources["ProgressArcGlowBrush"] = Brush(accent, 112);
+            var shadow = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                BlurRadius = 18,
+                Color = accent,
+                Opacity = 0.55,
+                ShadowDepth = 2,
+                Direction = 270
+            };
+            shadow.Freeze();
+            resources["IslandShadowEffect"] = shadow;
             _logger?.LogInformation("Album Cover appearance palette updated from current artwork.");
         });
     }
