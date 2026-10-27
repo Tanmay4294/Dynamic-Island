@@ -436,7 +436,7 @@
                                               PreviewMouseWheel="PlaylistCarousel_PreviewMouseWheel">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
-                                            <controls:FanCarouselPanel />
+                                            <controls:FanCarouselPanel CardWidth="126" CardHeight="108" />
                                         </ItemsPanelTemplate>
                                     </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>

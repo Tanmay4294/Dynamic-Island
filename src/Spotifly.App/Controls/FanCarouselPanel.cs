@@ -22,6 +22,26 @@ public sealed class FanCarouselPanel : System.Windows.Controls.Panel
         set => SetValue(OffsetProperty, value);
     }
 
+    public static readonly DependencyProperty CardWidthProperty = DependencyProperty.Register(
+        nameof(CardWidth), typeof(double), typeof(FanCarouselPanel),
+        new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsMeasure | FrameworkPropertyMetadataOptions.AffectsArrange));
+
+    public double CardWidth
+    {
+        get => (double)GetValue(CardWidthProperty);
+        set => SetValue(CardWidthProperty, value);
+    }
+
+    public static readonly DependencyProperty CardHeightProperty = DependencyProperty.Register(
+        nameof(CardHeight), typeof(double), typeof(FanCarouselPanel),
+        new FrameworkPropertyMetadata(0.0, FrameworkPropertyMetadataOptions.AffectsMeasure | FrameworkPropertyMetadataOptions.AffectsArrange));
+
+    public double CardHeight
+    {
+        get => (double)GetValue(CardHeightProperty);
+        set => SetValue(CardHeightProperty, value);
+    }
+
     public int ItemCount => InternalChildren.Count;
 
     public void SetOffset(double value)
@@ -97,9 +117,9 @@ public sealed class FanCarouselPanel : System.Windows.Controls.Panel
         return finalSize;
     }
 
-    private static System.Windows.Size GetCardSize(double width, double height) => new(
-        Math.Clamp(width * 0.34, 92, 116),
-        Math.Clamp(height * 0.90, 92, 100));
+    private System.Windows.Size GetCardSize(double width, double height) => new(
+        CardWidth > 0 ? CardWidth : Math.Clamp(width * 0.34, 92, 116),
+        CardHeight > 0 ? CardHeight : Math.Clamp(height * 0.90, 92, 100));
 
     private static object CoerceOffset(DependencyObject d, object baseValue)
     {
