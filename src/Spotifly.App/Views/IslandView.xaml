@@ -42,7 +42,7 @@
                                                 ProgressBrush="{DynamicResource ProgressArcForegroundBrush}"
                                                 GlowBrush="{DynamicResource ProgressArcGlowBrush}"
                                                 IsCompact="True"
-                                                Panel.ZIndex="1"
+                                                Panel.ZIndex="10"
                                                 IsHitTestVisible="False" />
 
             <!-- Island Inner Content Container clipped to the exact Vector Geometry -->
@@ -509,11 +509,10 @@
                         <!-- 3. Playlist Song List Panel (Phase 9) -->
                         <Border x:Name="PlaylistTracksPanel"
                                 Visibility="Collapsed"
-                                Background="#18FFFFFF"
-                                BorderBrush="#22FFFFFF"
-                                BorderThickness="1"
-                                CornerRadius="16"
-                                Padding="8,6"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                CornerRadius="0"
+                                Padding="0"
                                 VerticalAlignment="Stretch">
                             <Grid>
                                 <Grid.RowDefinitions>
