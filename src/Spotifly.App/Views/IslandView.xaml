@@ -447,13 +447,13 @@
                                                         MouseLeftButtonUp="PlaylistItem_MouseLeftButtonUp">
                                                     <Grid>
                                                         <Grid.RowDefinitions>
-                                                            <RowDefinition Height="62" />
+                                                            <RowDefinition Height="64" />
                                                             <RowDefinition Height="*" />
                                                         </Grid.RowDefinitions>
 
                                                         <!-- Playlist Cover Thumbnail -->
                                                         <Border Grid.Row="0"
-                                                                Width="56" Height="56"
+                                                                Width="58" Height="58"
                                                                 CornerRadius="6"
                                                                 ClipToBounds="True"
                                                                 Background="#282828"
@@ -482,10 +482,6 @@
                                                                        TextTrimming="CharacterEllipsis"
                                                                        MaxWidth="98"
                                                                        ToolTip="{Binding Name}" />
-                                                            <TextBlock Text="{Binding TotalTracks, StringFormat='{}{0} tracks'}"
-                                                                       FontSize="9"
-                                                                       Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
-                                                                       TextAlignment="Center" />
                                                         </StackPanel>
 
                                                         <!-- Open in Spotify Action Button -->
@@ -609,47 +605,34 @@
                                             Click="RefreshTracksButton_Click" />
                                 </StackPanel>
 
-                                <!-- Scrollable Track Rows Collection -->
-                                <ScrollViewer x:Name="TracksScrollViewer"
-                                              Grid.Row="1"
-                                              VerticalScrollBarVisibility="Auto"
-                                              HorizontalScrollBarVisibility="Disabled"
-                                              PreviewMouseWheel="ScrollViewer_PreviewMouseWheel">
-                                    <ItemsControl x:Name="TracksItemsControl">
+                                <!-- Songs use the same animated, looping fan layout as playlists. -->
+                                <ItemsControl x:Name="TracksItemsControl" Grid.Row="1" ClipToBounds="False"
+                                              PreviewMouseWheel="TrackCarousel_PreviewMouseWheel">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <controls:FanCarouselPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Margin="2,2,2,4"
-                                                        Padding="6,4"
-                                                        CornerRadius="8"
-                                                        Background="#12FFFFFF"
+                                                <Border Padding="5"
+                                                        Background="Transparent"
                                                         Cursor="Hand"
                                                         MouseLeftButtonUp="TrackItem_MouseLeftButtonUp">
-                                                    <Border.Style>
-                                                        <Style TargetType="Border">
-                                                            <Style.Triggers>
-                                                                <Trigger Property="IsMouseOver" Value="True">
-                                                                    <Setter Property="Background" Value="{DynamicResource IslandButtonHoverBrush}" />
-                                                                </Trigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Border.Style>
-
                                                     <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <!-- Artwork Thumbnail -->
-                                                            <ColumnDefinition Width="32" />
-                                                            <!-- Track Name and Artist -->
-                                                            <ColumnDefinition Width="*" />
-                                                            <!-- Play Button / Duration -->
-                                                            <ColumnDefinition Width="26" />
-                                                        </Grid.ColumnDefinitions>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="62" />
+                                                            <RowDefinition Height="*" />
+                                                        </Grid.RowDefinitions>
 
-                                                        <!-- Track Thumbnail with fallback -->
-                                                        <Border Grid.Column="0"
-                                                                Width="28" Height="28"
+                                                        <!-- Track artwork keeps its existing loading and fallback behavior. -->
+                                                        <Border Grid.Row="0"
+                                                                Width="56" Height="56"
                                                                 CornerRadius="4"
                                                                 ClipToBounds="True"
-                                                                Background="#282828">
+                                                                Background="#282828"
+                                                                HorizontalAlignment="Center"
+                                                                VerticalAlignment="Center">
                                                             <Grid>
                                                                 <Path Fill="{DynamicResource IslandSecondaryForegroundBrush}"
                                                                       Width="12" Height="12"
@@ -664,29 +647,35 @@
                                                         </Border>
 
                                                         <!-- Song Title & Artist Name with CharacterEllipsis and Tooltip -->
-                                                        <StackPanel Grid.Column="1" Margin="8,0,4,0" VerticalAlignment="Center">
+                                                        <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center">
                                                             <TextBlock Text="{Binding Name}"
-                                                                       FontSize="12"
+                                                                       FontSize="10"
                                                                        FontWeight="SemiBold"
                                                                        Foreground="{DynamicResource IslandForegroundBrush}"
+                                                                       TextAlignment="Center"
                                                                        TextTrimming="CharacterEllipsis"
+                                                                       MaxWidth="98"
                                                                        ToolTip="{Binding Name}" />
                                                             <TextBlock Text="{Binding ArtistName}"
-                                                                       FontSize="10"
+                                                                       FontSize="9"
                                                                        Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
+                                                                       TextAlignment="Center"
                                                                        TextTrimming="CharacterEllipsis"
+                                                                       MaxWidth="98"
                                                                        ToolTip="{Binding ArtistName}" />
                                                         </StackPanel>
 
                                                         <!-- Play Action Button -->
-                                                        <Button Grid.Column="2"
-                                                                Width="22" Height="22"
+                                                        <Button Grid.Row="0"
+                                                                Width="18" Height="18"
+                                                                HorizontalAlignment="Right"
+                                                                VerticalAlignment="Top"
                                                                 ToolTip="Play this song"
                                                                 Style="{DynamicResource IslandCircleButtonStyle}"
                                                                 Click="PlayTrackButton_Click"
                                                                 Tag="{Binding}">
                                                             <Path Fill="{DynamicResource IslandAccentBrush}"
-                                                                  Width="11" Height="11"
+                                                                  Width="10" Height="10"
                                                                   Stretch="Uniform"
                                                                   Data="M8,5.14V19.14L19,12.14L8,5.14Z" />
                                                         </Button>
@@ -694,8 +683,7 @@
                                                 </Border>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
+                                </ItemsControl>
                             </Grid>
                         </Border>
                     </Grid>

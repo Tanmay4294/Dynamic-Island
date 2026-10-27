@@ -38,6 +38,8 @@ public partial class IslandView : Window
     private PlaylistInfo? _selectedPlaylist;
     private double _lastPlaylistCarouselOffset;
     private FanCarouselPanel? _playlistCarouselPanel;
+    private double _lastTrackCarouselOffset;
+    private FanCarouselPanel? _trackCarouselPanel;
     private bool _isPlaybackRequestInProgress;
     private string? _currentArtworkUrl;
     private int _artworkLoadVersion;
@@ -1249,11 +1251,16 @@ public partial class IslandView : Window
         TracksStatusText.Text = "Loading songs...";
         RetryTracksButton.Visibility = Visibility.Collapsed;
         TracksItemsControl.ItemsSource = null;
+        _trackCarouselPanel = null;
 
         try
         {
             var tracks = await _spotifyService.GetPlaylistTracksAsync(playlistId, forceRefresh);
             TracksItemsControl.ItemsSource = tracks;
+            _ = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+            {
+                GetTrackCarouselPanel()?.SetOffset(_lastTrackCarouselOffset);
+            }));
 
             if (tracks == null || tracks.Count == 0)
             {
@@ -1309,6 +1316,21 @@ public partial class IslandView : Window
     {
         if (sender is FrameworkElement elem && elem.DataContext is TrackInfo track)
         {
+            var carousel = GetTrackCarouselPanel();
+            if (carousel != null)
+            {
+                int index = TracksItemsControl.Items.IndexOf(track);
+                if (index >= 0)
+                {
+                    _lastTrackCarouselOffset = index;
+                    var centerAnimation = new DoubleAnimation(carousel.Offset, index, TimeSpan.FromMilliseconds(190))
+                    {
+                        EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+                        FillBehavior = FillBehavior.HoldEnd
+                    };
+                    carousel.BeginAnimation(FanCarouselPanel.OffsetProperty, centerAnimation, HandoffBehavior.SnapshotAndReplace);
+                }
+            }
             await PlayTrackInternalAsync(track);
         }
     }
@@ -1339,7 +1361,7 @@ public partial class IslandView : Window
         }
 
         _isPlaybackRequestInProgress = true;
-        TracksScrollViewer.IsEnabled = false; // Disable list clicks during request
+        TracksItemsControl.IsEnabled = false; // Disable repeated song clicks during request.
         ShowToast($"Starting \"{track.Name}\"...", isError: false);
 
         try
@@ -1362,7 +1384,7 @@ public partial class IslandView : Window
         {
             // Restore UI interactivity on success, failure, or cancellation
             _isPlaybackRequestInProgress = false;
-            TracksScrollViewer.IsEnabled = true;
+            TracksItemsControl.IsEnabled = true;
         }
     }
 
@@ -1394,7 +1416,16 @@ public partial class IslandView : Window
 
     private void PlaylistCarousel_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        var carousel = GetPlaylistCarouselPanel();
+        AnimateCarouselWheel(GetPlaylistCarouselPanel(), e);
+    }
+
+    private void TrackCarousel_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        AnimateCarouselWheel(GetTrackCarouselPanel(), e);
+    }
+
+    private void AnimateCarouselWheel(FanCarouselPanel? carousel, MouseWheelEventArgs e)
+    {
         if (carousel == null || carousel.ItemCount <= 1)
         {
             e.Handled = true;
@@ -1405,6 +1436,11 @@ public partial class IslandView : Window
         // Keep the fan circular: advancing beyond either end brings the next
         // playlist in from the opposite side without a stopping boundary.
         double to = from - e.Delta / 120.0;
+        if (ReferenceEquals(carousel, _trackCarouselPanel))
+            _lastTrackCarouselOffset = PositiveModulo(to, carousel.ItemCount);
+        else if (ReferenceEquals(carousel, _playlistCarouselPanel))
+            _lastPlaylistCarouselOffset = PositiveModulo(to, carousel.ItemCount);
+
         if (Math.Abs(to - from) > 0.001)
         {
             var motion = new DoubleAnimation(from, to, TimeSpan.FromMilliseconds(230))
@@ -1418,6 +1454,12 @@ public partial class IslandView : Window
         e.Handled = true;
     }
 
+    private static double PositiveModulo(double value, int count)
+    {
+        double result = value % count;
+        return result < 0 ? result + count : result;
+    }
+
     private FanCarouselPanel? GetPlaylistCarouselPanel()
     {
         if (_playlistCarouselPanel != null)
@@ -1425,6 +1467,15 @@ public partial class IslandView : Window
 
         _playlistCarouselPanel = FindVisualChild<FanCarouselPanel>(PlaylistsItemsControl);
         return _playlistCarouselPanel;
+    }
+
+    private FanCarouselPanel? GetTrackCarouselPanel()
+    {
+        if (_trackCarouselPanel != null)
+            return _trackCarouselPanel;
+
+        _trackCarouselPanel = FindVisualChild<FanCarouselPanel>(TracksItemsControl);
+        return _trackCarouselPanel;
     }
 
     private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
@@ -1476,10 +1527,10 @@ public partial class IslandView : Window
             if (bounds.Contains(ptInWindow)) return true;
         }
 
-        if (PlaylistTracksPanel.Visibility == Visibility.Visible && TracksScrollViewer.IsVisible)
+        if (PlaylistTracksPanel.Visibility == Visibility.Visible && TracksItemsControl.IsVisible)
         {
-            var bounds = TracksScrollViewer.TransformToAncestor(this).TransformBounds(
-                new Rect(0, 0, TracksScrollViewer.ActualWidth, TracksScrollViewer.ActualHeight));
+            var bounds = TracksItemsControl.TransformToAncestor(this).TransformBounds(
+                new Rect(0, 0, TracksItemsControl.ActualWidth, TracksItemsControl.ActualHeight));
             if (bounds.Contains(ptInWindow)) return true;
         }
 
