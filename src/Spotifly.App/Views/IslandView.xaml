@@ -398,8 +398,8 @@
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
 
-                                <!-- Library Sub-header with Refresh action and count -->
-                                <Grid Grid.Row="0" Margin="4,0,4,6">
+                                <!-- The carousel owns the full body; there is no playlist title row. -->
+                                <Grid Grid.Row="0" Visibility="Collapsed">
                                     <TextBlock x:Name="PlaylistCountText"
                                                Text="Your Playlists"
                                                FontSize="11"
@@ -442,29 +442,18 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Border Padding="5"
-                                                        CornerRadius="8"
-                                                        Background="#12FFFFFF"
+                                                        Background="Transparent"
                                                         Cursor="Hand"
                                                         MouseLeftButtonUp="PlaylistItem_MouseLeftButtonUp">
-                                                    <Border.Style>
-                                                        <Style TargetType="Border">
-                                                            <Style.Triggers>
-                                                                <Trigger Property="IsMouseOver" Value="True">
-                                                                    <Setter Property="Background" Value="{DynamicResource IslandButtonHoverBrush}" />
-                                                                </Trigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Border.Style>
-
                                                     <Grid>
                                                         <Grid.RowDefinitions>
-                                                            <RowDefinition Height="56" />
+                                                            <RowDefinition Height="62" />
                                                             <RowDefinition Height="*" />
                                                         </Grid.RowDefinitions>
 
                                                         <!-- Playlist Cover Thumbnail -->
                                                         <Border Grid.Row="0"
-                                                                Width="50" Height="50"
+                                                                Width="56" Height="56"
                                                                 CornerRadius="6"
                                                                 ClipToBounds="True"
                                                                 Background="#282828"

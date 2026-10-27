@@ -1402,7 +1402,9 @@ public partial class IslandView : Window
         }
 
         double from = carousel.Offset;
-        double to = Math.Clamp(from - e.Delta / 120.0, 0, carousel.ItemCount - 1);
+        // Keep the fan circular: advancing beyond either end brings the next
+        // playlist in from the opposite side without a stopping boundary.
+        double to = from - e.Delta / 120.0;
         if (Math.Abs(to - from) > 0.001)
         {
             var motion = new DoubleAnimation(from, to, TimeSpan.FromMilliseconds(230))

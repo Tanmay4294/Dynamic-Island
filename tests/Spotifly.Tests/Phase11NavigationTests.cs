@@ -223,6 +223,29 @@ public class Phase11NavigationTests
     }
 
     [Fact]
+    public void FanCarouselPanel_WrapsOffsetPastLastPlaylist()
+    {
+        var thread = new Thread(() =>
+        {
+            var panel = new FanCarouselPanel();
+            for (int i = 0; i < 4; i++)
+                panel.Children.Add(new Border());
+
+            panel.Offset = 4;
+            panel.Measure(new Size(300, 108));
+            panel.Arrange(new Rect(0, 0, 300, 108));
+
+            var wrappedFirst = Assert.IsType<TransformGroup>(panel.Children[0].RenderTransform);
+            Assert.Equal(0, Assert.IsType<RotateTransform>(wrappedFirst.Children[1]).Angle);
+            Assert.Equal(1, panel.Children[0].Opacity);
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        Assert.True(thread.Join(5000), "WPF carousel wrapping test thread timed out.");
+    }
+
+    [Fact]
     public void IslandView_ClickedPlaylistCard_OpensPlaylistTracks()
     {
         var thread = new Thread(() =>

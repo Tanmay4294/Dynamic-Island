@@ -50,12 +50,17 @@ public sealed class FanCarouselPanel : System.Windows.Controls.Panel
         double height = Math.Max(1, finalSize.Height);
         var cardSize = GetCardSize(width, height);
         double centerX = width / 2;
+        double centerOffset = PositiveModulo(Offset, count);
         double baseY = Math.Max(0, (height - cardSize.Height) * 0.08);
 
         for (int i = 0; i < count; i++)
         {
             var child = InternalChildren[i];
-            double relative = i - Offset;
+            double relative = i - centerOffset;
+            if (relative > count / 2.0)
+                relative -= count;
+            else if (relative < -count / 2.0)
+                relative += count;
             double distance = Math.Abs(relative);
             if (distance > 2.45)
             {
@@ -70,7 +75,7 @@ public sealed class FanCarouselPanel : System.Windows.Controls.Panel
             double angle = normalized * 39;
             double radians = Math.Abs(angle) * Math.PI / 180;
             double scale = Math.Max(0.68, 1 - distance * 0.14);
-            double spacing = Math.Min(cardSize.Width * 0.66, width * 0.205);
+            double spacing = Math.Min(cardSize.Width * 0.94, width * 0.29);
             double x = centerX + relative * spacing - cardSize.Width / 2;
             double y = baseY + (1 - Math.Cos(radians)) * Math.Min(42, height * 0.38);
 
@@ -100,6 +105,12 @@ public sealed class FanCarouselPanel : System.Windows.Controls.Panel
     {
         var panel = (FanCarouselPanel)d;
         double value = baseValue is double number && double.IsFinite(number) ? number : 0;
-        return Math.Clamp(value, 0, Math.Max(0, panel.InternalChildren.Count - 1));
+        return value;
+    }
+
+    private static double PositiveModulo(double value, int modulus)
+    {
+        double result = value % modulus;
+        return result < 0 ? result + modulus : result;
     }
 }
