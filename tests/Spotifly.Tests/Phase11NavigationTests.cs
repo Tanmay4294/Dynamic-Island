@@ -1,10 +1,12 @@
 using Spotifly.App.Models;
 using Spotifly.App.Services;
 using Spotifly.App.Views;
+using Spotifly.App.Controls;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using Xunit;
 
 namespace Spotifly.Tests;
@@ -124,7 +126,7 @@ public class Phase11NavigationTests
     }
 
     [Fact]
-    public void IslandView_BackToPlaylists_RestoresStateAndScrollPosition()
+    public void IslandView_BackToPlaylists_RestoresLibraryState()
     {
         var thread = new Thread(() =>
         {
@@ -134,10 +136,6 @@ public class Phase11NavigationTests
             // Simulate selecting a playlist and entering PlaylistTracks
             window.TransitionToState(IslandState.Library);
             Assert.Equal(IslandState.Library, window.CurrentState);
-
-            // Set a test scroll offset on PlaylistsScrollViewer
-            var playlistsScroller = window.FindName("PlaylistsScrollViewer") as ScrollViewer;
-            Assert.NotNull(playlistsScroller);
 
             // Transition to PlaylistTracks
             window.TransitionToState(IslandState.PlaylistTracks);
@@ -163,17 +161,17 @@ public class Phase11NavigationTests
     }
 
     [Fact]
-    public void IslandView_ListScrollViewer_HandlesMouseWheelDirectly_PreventingBubbling()
+    public void IslandView_PlaylistCarousel_HandlesMouseWheelPreventingBubbling()
     {
         var thread = new Thread(() =>
         {
             var positionService = new OverlayPositionService();
             var window = new IslandView(positionService);
 
-            var playlistsScroller = window.FindName("PlaylistsScrollViewer") as ScrollViewer;
-            Assert.NotNull(playlistsScroller);
+            var playlists = window.FindName("PlaylistsItemsControl") as ItemsControl;
+            Assert.NotNull(playlists);
 
-            var wheelHandler = typeof(IslandView).GetMethod("ScrollViewer_PreviewMouseWheel", BindingFlags.NonPublic | BindingFlags.Instance);
+            var wheelHandler = typeof(IslandView).GetMethod("PlaylistCarousel_PreviewMouseWheel", BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.NotNull(wheelHandler);
 
             // Construct MouseWheelEventArgs
@@ -183,11 +181,11 @@ public class Phase11NavigationTests
                 RoutedEvent = UIElement.PreviewMouseWheelEvent
             };
 
-            // Invoke list scroll handler
-            wheelHandler.Invoke(window, new object[] { playlistsScroller, eventArgs });
+            // Empty carousel still consumes the wheel and prevents a mode switch.
+            wheelHandler.Invoke(window, new object[] { playlists, eventArgs });
 
             // Handled must be true to isolate scrolling and stop bubbling to top-level mode switch
-            Assert.True(eventArgs.Handled, "ScrollViewer_PreviewMouseWheel must mark event as Handled to isolate list scrolling.");
+            Assert.True(eventArgs.Handled, "PlaylistCarousel_PreviewMouseWheel must isolate carousel movement from top-level navigation.");
 
             window.Close();
         });
@@ -195,6 +193,65 @@ public class Phase11NavigationTests
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         thread.Join(5000);
+    }
+
+    [Fact]
+    public void FanCarouselPanel_ArrangesCenterUprightAndEdgesRotatedOutward()
+    {
+        var thread = new Thread(() =>
+        {
+            var panel = new FanCarouselPanel();
+            for (int i = 0; i < 5; i++)
+                panel.Children.Add(new Border());
+            panel.Offset = 2;
+
+            panel.Measure(new Size(300, 108));
+            panel.Arrange(new Rect(0, 0, 300, 108));
+
+            var first = Assert.IsType<TransformGroup>(panel.Children[0].RenderTransform);
+            var center = Assert.IsType<TransformGroup>(panel.Children[2].RenderTransform);
+            var last = Assert.IsType<TransformGroup>(panel.Children[4].RenderTransform);
+            Assert.True(Assert.IsType<RotateTransform>(first.Children[1]).Angle < 0);
+            Assert.Equal(0, Assert.IsType<RotateTransform>(center.Children[1]).Angle);
+            Assert.True(Assert.IsType<RotateTransform>(last.Children[1]).Angle > 0);
+            Assert.True(panel.Children[2].Opacity > panel.Children[0].Opacity);
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        Assert.True(thread.Join(5000), "WPF carousel layout test thread timed out.");
+    }
+
+    [Fact]
+    public void IslandView_ClickedPlaylistCard_OpensPlaylistTracks()
+    {
+        var thread = new Thread(() =>
+        {
+            var window = new IslandView(new OverlayPositionService());
+            window.TransitionToState(IslandState.Library);
+            var playlistCard = new Border
+            {
+                DataContext = new PlaylistInfo
+                {
+                    Id = "playlist-1",
+                    Uri = "spotify:playlist:playlist-1",
+                    Name = "Test playlist"
+                }
+            };
+
+            var handler = typeof(IslandView).GetMethod("PlaylistItem_MouseLeftButtonUp", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(handler);
+            handler.Invoke(window, new object[] { playlistCard, new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left) });
+
+            Assert.Equal(IslandState.PlaylistTracks, window.CurrentState);
+            var selected = typeof(IslandView).GetField("_selectedPlaylist", BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(window);
+            Assert.Equal("playlist-1", Assert.IsType<PlaylistInfo>(selected).Id);
+            window.Close();
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        Assert.True(thread.Join(5000), "WPF playlist selection test thread timed out.");
     }
 
     [Fact]

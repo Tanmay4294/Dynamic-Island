@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Microsoft.Win32;
+using Spotifly.App.Controls;
 using Spotifly.App.Models;
 using Spotifly.App.Services;
 
@@ -35,7 +36,8 @@ public partial class IslandView : Window
     private readonly DispatcherTimer _progressAnimationTimer;
     private readonly DispatcherTimer _toastTimer;
     private PlaylistInfo? _selectedPlaylist;
-    private double _lastPlaylistVerticalOffset;
+    private double _lastPlaylistCarouselOffset;
+    private FanCarouselPanel? _playlistCarouselPanel;
     private bool _isPlaybackRequestInProgress;
     private string? _currentArtworkUrl;
     private int _artworkLoadVersion;
@@ -1188,6 +1190,11 @@ public partial class IslandView : Window
         {
             var playlists = await _spotifyService.GetUserPlaylistsAsync(forceRefresh);
             PlaylistsItemsControl.ItemsSource = playlists;
+            _playlistCarouselPanel = null;
+            _ = Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+            {
+                GetPlaylistCarouselPanel()?.SetOffset(_lastPlaylistCarouselOffset);
+            }));
 
             if (playlists == null || playlists.Count == 0)
             {
@@ -1228,7 +1235,7 @@ public partial class IslandView : Window
         {
             _logger?.LogInformation($"Selected playlist: {playlist.Name} ({playlist.Id}). Transitioning to PlaylistTracks state.");
             _selectedPlaylist = playlist;
-            _lastPlaylistVerticalOffset = PlaylistsScrollViewer.VerticalOffset;
+            _lastPlaylistCarouselOffset = GetPlaylistCarouselPanel()?.Offset ?? _lastPlaylistCarouselOffset;
             ActivePlaylistNameText.Text = playlist.Name;
             TransitionToState(IslandState.PlaylistTracks);
         }
@@ -1274,10 +1281,10 @@ public partial class IslandView : Window
         _hideTimer.Stop();
 
         TransitionToState(IslandState.Library);
-        // Restore previous scroll position
+        // Restore the previous fan position after the track panel is replaced.
         Dispatcher.InvokeAsync(() =>
         {
-            PlaylistsScrollViewer.ScrollToVerticalOffset(_lastPlaylistVerticalOffset);
+            GetPlaylistCarouselPanel()?.SetOffset(_lastPlaylistCarouselOffset);
         });
 
         _isInteracting = false;
@@ -1385,6 +1392,55 @@ public partial class IslandView : Window
         }
     }
 
+    private void PlaylistCarousel_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        var carousel = GetPlaylistCarouselPanel();
+        if (carousel == null || carousel.ItemCount <= 1)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        double from = carousel.Offset;
+        double to = Math.Clamp(from - e.Delta / 120.0, 0, carousel.ItemCount - 1);
+        if (Math.Abs(to - from) > 0.001)
+        {
+            var motion = new DoubleAnimation(from, to, TimeSpan.FromMilliseconds(230))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+                FillBehavior = FillBehavior.HoldEnd
+            };
+            carousel.BeginAnimation(FanCarouselPanel.OffsetProperty, motion, HandoffBehavior.SnapshotAndReplace);
+        }
+
+        e.Handled = true;
+    }
+
+    private FanCarouselPanel? GetPlaylistCarouselPanel()
+    {
+        if (_playlistCarouselPanel != null)
+            return _playlistCarouselPanel;
+
+        _playlistCarouselPanel = FindVisualChild<FanCarouselPanel>(PlaylistsItemsControl);
+        return _playlistCarouselPanel;
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        int childCount = VisualTreeHelper.GetChildrenCount(parent);
+        for (int i = 0; i < childCount; i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T match)
+                return match;
+
+            var descendant = FindVisualChild<T>(child);
+            if (descendant != null)
+                return descendant;
+        }
+        return null;
+    }
+
     private void IslandView_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
         // Top-level mouse-wheel navigation (Phase 11):
@@ -1395,7 +1451,7 @@ public partial class IslandView : Window
             return;
         }
 
-        // Check if cursor is over one of the list scroll viewers even if hit-tested on margin/scrollbar
+        // Keep wheel gestures over playlist cards separate from top-level view switching.
         if (IsOverScrollList(e.GetPosition(this)))
         {
             return;
@@ -1411,10 +1467,10 @@ public partial class IslandView : Window
 
     private bool IsOverScrollList(System.Windows.Point ptInWindow)
     {
-        if (PlaylistsLibraryPanel.Visibility == Visibility.Visible && PlaylistsScrollViewer.IsVisible)
+        if (PlaylistsLibraryPanel.Visibility == Visibility.Visible && PlaylistsItemsControl.IsVisible)
         {
-            var bounds = PlaylistsScrollViewer.TransformToAncestor(this).TransformBounds(
-                new Rect(0, 0, PlaylistsScrollViewer.ActualWidth, PlaylistsScrollViewer.ActualHeight));
+            var bounds = PlaylistsItemsControl.TransformToAncestor(this).TransformBounds(
+                new Rect(0, 0, PlaylistsItemsControl.ActualWidth, PlaylistsItemsControl.ActualHeight));
             if (bounds.Contains(ptInWindow)) return true;
         }
 

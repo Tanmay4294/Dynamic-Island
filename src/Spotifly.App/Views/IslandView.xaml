@@ -42,13 +42,14 @@
                                                 ProgressBrush="{DynamicResource ProgressArcForegroundBrush}"
                                                 GlowBrush="{DynamicResource ProgressArcGlowBrush}"
                                                 IsCompact="True"
-                                                Panel.ZIndex="10"
+                                                Panel.ZIndex="1"
                                                 IsHitTestVisible="False" />
 
             <!-- Island Inner Content Container clipped to the exact Vector Geometry -->
             <Grid x:Name="IslandContentContainer"
                   HorizontalAlignment="Stretch"
-                  VerticalAlignment="Stretch">
+                  VerticalAlignment="Stretch"
+                  Panel.ZIndex="2">
 
                 <!-- COMPACT VIEW: Exactly 3 items (Gear, Spotifly middle pill, Close X) -->
                 <!-- Positioned comfortably in the upper-middle area of the dome -->
@@ -385,12 +386,12 @@
                         </Border>
 
                         <!-- 2. Playlists Library Panel (Phase 8) -->
-                        <Border x:Name="PlaylistsLibraryPanel"
+                                <Border x:Name="PlaylistsLibraryPanel"
                                 Visibility="Collapsed"
                                 Background="Transparent"
                                 BorderThickness="0"
                                 Padding="0,4"
-                                VerticalAlignment="Stretch">
+                                        VerticalAlignment="Stretch">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -430,17 +431,17 @@
                                            VerticalAlignment="Center"
                                            Visibility="Collapsed" />
 
-                                <!-- Scrollable Playlist Rows Collection -->
-                                <ScrollViewer x:Name="PlaylistsScrollViewer"
-                                              Grid.Row="1"
-                                              VerticalScrollBarVisibility="Auto"
-                                              HorizontalScrollBarVisibility="Disabled"
-                                              PreviewMouseWheel="ScrollViewer_PreviewMouseWheel">
-                                    <ItemsControl x:Name="PlaylistsItemsControl">
+                                <!-- Playlist cards arranged on a responsive, animated fan arc. -->
+                                <ItemsControl x:Name="PlaylistsItemsControl" Grid.Row="1" ClipToBounds="False"
+                                              PreviewMouseWheel="PlaylistCarousel_PreviewMouseWheel">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <controls:FanCarouselPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Border Margin="2,2,2,4"
-                                                        Padding="6,4"
+                                                <Border Padding="5"
                                                         CornerRadius="8"
                                                         Background="#12FFFFFF"
                                                         Cursor="Hand"
@@ -456,21 +457,19 @@
                                                     </Border.Style>
 
                                                     <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <!-- Cover Thumbnail -->
-                                                            <ColumnDefinition Width="54" />
-                                                            <!-- Name and Track Count -->
-                                                            <ColumnDefinition Width="*" />
-                                                            <!-- Open in Spotify Icon -->
-                                                            <ColumnDefinition Width="24" />
-                                                        </Grid.ColumnDefinitions>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="56" />
+                                                            <RowDefinition Height="*" />
+                                                        </Grid.RowDefinitions>
 
                                                         <!-- Playlist Cover Thumbnail -->
-                                                        <Border Grid.Column="0"
-                                                                Width="48" Height="48"
+                                                        <Border Grid.Row="0"
+                                                                Width="50" Height="50"
                                                                 CornerRadius="6"
                                                                 ClipToBounds="True"
-                                                                Background="#282828">
+                                                                Background="#282828"
+                                                                HorizontalAlignment="Center"
+                                                                VerticalAlignment="Center">
                                                             <Grid>
                                                                 <Path Fill="{DynamicResource IslandSecondaryForegroundBrush}"
                                                                       Width="14" Height="14"
@@ -485,27 +484,32 @@
                                                         </Border>
 
                                                         <!-- Name & Details -->
-                                                        <StackPanel Grid.Column="1" Margin="8,0,4,0" VerticalAlignment="Center">
+                                                        <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center">
                                                             <TextBlock Text="{Binding Name}"
-                                                                       FontSize="12"
+                                                                       FontSize="10"
                                                                        FontWeight="SemiBold"
                                                                        Foreground="{DynamicResource IslandForegroundBrush}"
+                                                                       TextAlignment="Center"
                                                                        TextTrimming="CharacterEllipsis"
+                                                                       MaxWidth="98"
                                                                        ToolTip="{Binding Name}" />
                                                             <TextBlock Text="{Binding TotalTracks, StringFormat='{}{0} tracks'}"
-                                                                       FontSize="10"
-                                                                       Foreground="{DynamicResource IslandSecondaryForegroundBrush}" />
+                                                                       FontSize="9"
+                                                                       Foreground="{DynamicResource IslandSecondaryForegroundBrush}"
+                                                                       TextAlignment="Center" />
                                                         </StackPanel>
 
                                                         <!-- Open in Spotify Action Button -->
-                                                        <Button Grid.Column="2"
-                                                                Width="20" Height="20"
+                                                        <Button Grid.Row="0"
+                                                                Width="18" Height="18"
+                                                                HorizontalAlignment="Right"
+                                                                VerticalAlignment="Top"
                                                                 ToolTip="Open in Spotify"
                                                                 Style="{DynamicResource IslandCircleButtonStyle}"
                                                                 Click="OpenPlaylistInSpotify_Click"
                                                                 Tag="{Binding}">
                                                             <Path Fill="{DynamicResource IslandAccentBrush}"
-                                                                  Width="12" Height="12"
+                                                                  Width="11" Height="11"
                                                                   Stretch="Uniform"
                                                                   Data="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M16.59,16.43C16.41,16.72 16.03,16.81 15.74,16.63C13.39,15.2 10.43,14.88 6.95,15.67C6.62,15.75 6.29,15.54 6.21,15.21C6.13,14.88 6.34,14.55 6.67,14.47C10.48,13.6 13.75,13.96 16.39,15.58C16.68,15.76 16.77,16.14 16.59,16.43M17.81,13.71C17.58,14.08 17.1,14.2 16.73,13.97C14.04,12.32 9.94,11.84 6.76,12.81C6.35,12.93 5.91,12.7 5.79,12.29C5.67,11.88 5.9,11.44 6.31,11.32C9.94,10.22 14.47,10.75 17.55,12.65C17.92,12.88 18.04,13.36 17.81,13.71M17.92,10.88C14.69,8.95 9.38,8.78 6.3,9.71C5.81,9.86 5.29,9.58 5.14,9.09C4.99,8.6 5.27,8.08 5.76,7.93C9.3,6.86 15.17,7.07 18.88,9.28C19.32,9.54 19.46,10.11 19.2,10.55C18.94,11 18.36,11.14 17.92,10.88Z" />
                                                         </Button>
@@ -513,8 +517,7 @@
                                                 </Border>
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </ScrollViewer>
+                                </ItemsControl>
                             </Grid>
                         </Border>
 
